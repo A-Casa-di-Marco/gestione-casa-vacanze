@@ -615,6 +615,7 @@
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
       const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v9';
+      const DATA_VERSION = 10;
       const incomeTransactions = [
         ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '2026-01-03', '2026-01-04', 'posted', 'Guadagni Airbnb - gennaio 2026', 3],
         ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '2026-03-19', '2026-03-21', 'posted', 'Guadagni Airbnb - marzo 2026', 3],
@@ -739,6 +740,58 @@
         }
       ];
 
+      function migrateState(rawState) {
+        const sourceVersion = Number(rawState?.dataVersion) || 0;
+        const migrated = {
+          transactions: Array.isArray(rawState?.transactions) ? [...rawState.transactions] : [],
+          utilities: Array.isArray(rawState?.utilities) ? [...rawState.utilities] : [],
+          dataVersion: sourceVersion
+        };
+        if (sourceVersion >= DATA_VERSION) return migrated;
+
+        const removedFutureIncomeIds = new Set([
+          'report-airbnb-20260620-01', 'report-airbnb-20260720-01',
+          'report-airbnb-20260804-01', 'report-airbnb-20260917-01',
+          'tourist-tax-20260619-30'
+        ]);
+        migrated.transactions = migrated.transactions.filter(item => !removedFutureIncomeIds.has(item.id));
+        migrated.transactions = migrated.transactions.filter(item => !item.date || item.date >= ACCOUNTING_START);
+        migrated.utilities = migrated.utilities.filter(item => !item.date || item.date >= ACCOUNTING_START);
+
+        seedTransactions.forEach(seed => {
+          const existingIndex = migrated.transactions.findIndex(item => item.id === seed.id);
+          if (existingIndex >= 0) {
+            migrated.transactions[existingIndex] = { ...migrated.transactions[existingIndex], ...seed };
+            return;
+          }
+          const duplicate = migrated.transactions.some(item => item.type === seed.type && item.category === seed.category && Number(item.amount) === seed.amount && item.date === seed.date && item.description === seed.description && item.checkin === seed.checkin && item.checkout === seed.checkout);
+          if (!duplicate) migrated.transactions.push(seed);
+        });
+
+        billUtilities.filter(item => !item.date || item.date >= ACCOUNTING_START).forEach(seed => {
+          const existingIndex = migrated.utilities.findIndex(item => item.id === seed.id);
+          if (existingIndex >= 0) migrated.utilities[existingIndex] = { ...migrated.utilities[existingIndex], ...seed };
+          else migrated.utilities.push(seed);
+        });
+
+        const seenTransactions = new Set();
+        migrated.transactions = migrated.transactions.filter(item => {
+          const signature = [item.type, item.date, item.category, Number(item.amount).toFixed(2), item.description || '', item.checkin || '', item.checkout || ''].join('|');
+          if (seenTransactions.has(signature)) return false;
+          seenTransactions.add(signature);
+          return true;
+        });
+        const seenUtilities = new Set();
+        migrated.utilities = migrated.utilities.filter(item => {
+          const signature = [item.type, item.date, Number(item.consumption), Number(item.cost), item.periodStart || '', item.periodEnd || ''].join('|');
+          if (seenUtilities.has(signature)) return false;
+          seenUtilities.add(signature);
+          return true;
+        });
+        migrated.dataVersion = DATA_VERSION;
+        return migrated;
+      }
+
       let state = loadState();
       let editingTransactionId = null;
       let currentUser = null;
@@ -765,59 +818,16 @@
       function loadState() {
         try {
           const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY));
-          const loaded = {
-            transactions: Array.isArray(parsed?.transactions) ? parsed.transactions : [],
-            utilities: Array.isArray(parsed?.utilities) ? parsed.utilities : []
-          };
-          if (!localStorage.getItem(BILL_SEED_KEY)) {
-            const transactionIds = new Set(loaded.transactions.map(item => item.id));
-            const utilityIds = new Set(loaded.utilities.map(item => item.id));
-            loaded.transactions.push(...billTransactions.filter(item => !transactionIds.has(item.id)));
-            loaded.utilities.push(...billUtilities.filter(item => !utilityIds.has(item.id)));
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
-            localStorage.setItem(BILL_SEED_KEY, 'imported');
-          }
-          if (!localStorage.getItem(DATA_MIGRATION_KEY)) {
-            const removedFutureIncomeIds = new Set([
-              'report-airbnb-20260620-01', 'report-airbnb-20260720-01',
-              'report-airbnb-20260804-01', 'report-airbnb-20260917-01',
-              'tourist-tax-20260619-30'
-            ]);
-            loaded.transactions = loaded.transactions.filter(item => !removedFutureIncomeIds.has(item.id));
-            loaded.transactions = loaded.transactions.filter(item => !item.date || item.date >= ACCOUNTING_START);
-            loaded.utilities = loaded.utilities.filter(item => !item.date || item.date >= ACCOUNTING_START);
-            seedTransactions.forEach(seed => {
-              const existingIndex = loaded.transactions.findIndex(item => item.id === seed.id);
-              if (existingIndex >= 0) {
-                loaded.transactions[existingIndex] = { ...loaded.transactions[existingIndex], ...seed };
-                return;
-              }
-              const duplicate = loaded.transactions.some(item => item.type === seed.type && item.category === seed.category && Number(item.amount) === seed.amount && item.date === seed.date && item.description === seed.description && item.checkin === seed.checkin && item.checkout === seed.checkout);
-              if (!duplicate) loaded.transactions.push(seed);
-            });
-            const seenTransactions = new Set();
-            loaded.transactions = loaded.transactions.filter(item => {
-              const signature = [item.type, item.date, item.category, Number(item.amount).toFixed(2), item.description || '', item.checkin || '', item.checkout || ''].join('|');
-              if (seenTransactions.has(signature)) return false;
-              seenTransactions.add(signature);
-              return true;
-            });
-            const seenUtilities = new Set();
-            loaded.utilities = loaded.utilities.filter(item => {
-              const signature = [item.type, item.date, Number(item.consumption), Number(item.cost), item.periodStart || '', item.periodEnd || ''].join('|');
-              if (seenUtilities.has(signature)) return false;
-              seenUtilities.add(signature);
-              return true;
-            });
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
-            localStorage.setItem(DATA_MIGRATION_KEY, 'imported');
-          }
+          const loaded = migrateState(parsed);
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
+          localStorage.setItem(BILL_SEED_KEY, 'imported');
+          localStorage.setItem(DATA_MIGRATION_KEY, 'imported');
           return loaded;
         } catch (_) {
-          const initial = {
+          const initial = migrateState({
             transactions: [...seedTransactions],
             utilities: billUtilities.filter(item => !item.date || item.date >= ACCOUNTING_START)
-          };
+          });
           localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
           localStorage.setItem(BILL_SEED_KEY, 'imported');
           localStorage.setItem(DATA_MIGRATION_KEY, 'imported');
@@ -858,6 +868,7 @@
         if (!currentUser || !supabaseClient || remoteSyncBusy) return;
         remoteSyncBusy = true;
         try {
+          state.dataVersion = DATA_VERSION;
           const { error } = await supabaseClient.from('app_state').upsert({
             user_id: currentUser.id,
             data: state,
@@ -886,6 +897,7 @@
             .maybeSingle();
           if (error) throw error;
           if (!data) {
+            state = migrateState(state);
             const { error: insertError } = await supabaseClient.from('app_state').insert({
               user_id: currentUser.id,
               data: state,
@@ -893,11 +905,20 @@
             });
             if (insertError) throw insertError;
           } else if (Array.isArray(data.data?.transactions) && Array.isArray(data.data?.utilities)) {
-            const remoteState = { transactions: data.data.transactions, utilities: data.data.utilities };
+            const remoteVersion = Number(data.data.dataVersion) || 0;
+            const remoteState = migrateState(data.data);
             if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
               state = remoteState;
               localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
               renderAll();
+            }
+            if (remoteVersion < DATA_VERSION) {
+              const { error: migrationError } = await supabaseClient.from('app_state').upsert({
+                user_id: currentUser.id,
+                data: remoteState,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'user_id' });
+              if (migrationError) throw migrationError;
             }
           }
           setSyncStatus('Sincronizzato');
@@ -1196,7 +1217,8 @@
             const newUtilities = imported.utilities.filter(item => item?.id && !utilityIds.has(item.id));
             state = {
               transactions: [...state.transactions, ...newTransactions],
-              utilities: [...state.utilities, ...newUtilities]
+              utilities: [...state.utilities, ...newUtilities],
+              dataVersion: DATA_VERSION
             };
             saveState(`${newTransactions.length + newUtilities.length} nuove voci importate`);
           }
@@ -1212,7 +1234,7 @@
 
       $('#clear-data').addEventListener('click', () => {
         if (confirm('Confermi di voler cancellare tutti i dati? Questa operazione non si può annullare.')) {
-          state = { transactions: [], utilities: [] };
+          state = { transactions: [], utilities: [], dataVersion: DATA_VERSION };
           saveState('Tutti i dati sono stati cancellati');
         }
       });
