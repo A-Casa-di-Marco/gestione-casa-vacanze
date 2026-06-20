@@ -93,6 +93,11 @@
       font-weight: 700;
     }
     .nav-button:hover, .nav-button.active { color: #fff; background: rgba(255,255,255,0.12); }
+    .account-panel { display: flex; align-items: center; gap: 8px; }
+    .sync-status { color: #c9ddd7; font-size: 12px; white-space: nowrap; }
+    .account-email { max-width: 180px; overflow: hidden; color: #fff; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+    .account-button { min-height: 34px; border: 1px solid rgba(255,255,255,.2); border-radius: 7px; padding: 6px 10px; color: #fff; background: rgba(255,255,255,.08); font-size: 12px; font-weight: 800; }
+    .account-button:hover { background: rgba(255,255,255,.16); }
 
     main {
       width: min(1180px, calc(100% - 32px));
@@ -312,6 +317,14 @@
     .type-switch input[value="income"]:checked + label { color: var(--income); border-color: var(--income); background: var(--income-soft); }
     .type-switch input[value="expense"]:checked + label { color: var(--expense); border-color: var(--expense); background: var(--expense-soft); }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
+    .auth-dialog { width: min(430px, calc(100% - 28px)); }
+    .auth-brand { padding: 24px 22px 8px; text-align: center; }
+    .auth-brand .brand-mark { margin: 0 auto 12px; }
+    .auth-brand h2 { margin: 0 0 5px; }
+    .auth-brand p { margin: 0; color: var(--muted); font-size: 13px; }
+    .auth-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-top: 18px; }
+    .auth-message { min-height: 20px; margin: 12px 0 0; color: var(--muted); font-size: 13px; text-align: center; }
+    .auth-message.error { color: var(--expense); }
 
     .toast {
       position: fixed;
@@ -336,6 +349,8 @@
       .desktop-nav { display: none; }
       .topbar { min-height: 60px; padding: 10px 16px; }
       .brand span { display: none; }
+      .account-email { display: none; }
+      .sync-status { max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
       main { width: min(100% - 24px, 680px); padding-top: 22px; }
       .page-heading { align-items: stretch; flex-direction: column; }
       .heading-actions { width: 100%; }
@@ -392,6 +407,11 @@
         <button class="nav-button" data-view="utilities">Consumi</button>
         <button class="nav-button" data-view="settings">Dati</button>
       </nav>
+      <div class="account-panel">
+        <span class="sync-status" id="sync-status">Accesso richiesto</span>
+        <span class="account-email" id="account-email"></span>
+        <button class="account-button" id="logout-button" hidden>Esci</button>
+      </div>
     </header>
 
     <main>
@@ -552,13 +572,36 @@
     </form>
   </dialog>
 
+  <dialog class="auth-dialog" id="auth-dialog">
+    <form id="auth-form">
+      <div class="auth-brand">
+        <div class="brand-mark">A</div>
+        <h2>Gestione Casa Vacanze</h2>
+        <p>Accedi per sincronizzare i dati su tutti i dispositivi.</p>
+      </div>
+      <div class="dialog-body">
+        <div class="form-field"><label for="auth-email">Email</label><input id="auth-email" type="email" autocomplete="email" required></div>
+        <div class="form-field" style="margin-top:12px"><label for="auth-password">Password</label><input id="auth-password" type="password" minlength="8" autocomplete="current-password" required></div>
+        <div class="auth-actions">
+          <button class="button secondary" id="signup-button" type="button">Crea account</button>
+          <button class="button" type="submit">Accedi</button>
+        </div>
+        <p class="auth-message" id="auth-message" aria-live="polite"></p>
+      </div>
+    </form>
+  </dialog>
+
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     (() => {
       'use strict';
 
       const STORAGE_KEY = 'a-casa-di-marco-manager-v1';
+      const SUPABASE_URL = 'https://vfifybgunchojyirfqez.supabase.co';
+      const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_09qb8Z_OzQVmZYR3Y93xkA_sWKRBQUf';
+      const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
       const categories = {
         income: ['Prenotazione diretta', 'Booking', 'Airbnb', 'Servizio a ore', 'Tassa di soggiorno', 'Extra', 'Altro'],
         expense: ['Pulizie', 'Lavanderia', 'Utenze', 'Internet', 'Rimborsi', 'Manutenzione', 'Commissioni', 'Tasse', 'Tassa di soggiorno', 'Forniture', 'Colazione', 'Altro']
@@ -689,6 +732,10 @@
 
       let state = loadState();
       let editingTransactionId = null;
+      let currentUser = null;
+      let remoteSaveTimer = null;
+      let remoteSyncBusy = false;
+      let localDirty = false;
       const euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
       const number = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 3 });
       const today = new Date().toISOString().slice(0, 10);
@@ -772,6 +819,7 @@
       function saveState(message) {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
         renderAll();
+        scheduleRemoteSave();
         if (message) showToast(message);
       }
 
@@ -781,6 +829,113 @@
         toast.classList.add('show');
         clearTimeout(showToast.timer);
         showToast.timer = setTimeout(() => toast.classList.remove('show'), 2300);
+      }
+
+      function setSyncStatus(message, isError = false) {
+        const status = $('#sync-status');
+        status.textContent = message;
+        status.style.color = isError ? '#ff9b9b' : '';
+      }
+
+      function scheduleRemoteSave() {
+        if (!currentUser || !supabaseClient) return;
+        localDirty = true;
+        setSyncStatus('Salvataggio...');
+        clearTimeout(remoteSaveTimer);
+        remoteSaveTimer = setTimeout(pushRemoteState, 450);
+      }
+
+      async function pushRemoteState() {
+        if (!currentUser || !supabaseClient || remoteSyncBusy) return;
+        remoteSyncBusy = true;
+        try {
+          const { error } = await supabaseClient.from('app_state').upsert({
+            user_id: currentUser.id,
+            data: state,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'user_id' });
+          if (error) throw error;
+          localDirty = false;
+          setSyncStatus('Sincronizzato');
+        } catch (error) {
+          console.error(error);
+          setSyncStatus('Errore sincronizzazione', true);
+        } finally {
+          remoteSyncBusy = false;
+        }
+      }
+
+      async function pullRemoteState() {
+        if (!currentUser || !supabaseClient || remoteSyncBusy || localDirty) return;
+        remoteSyncBusy = true;
+        setSyncStatus('Sincronizzazione...');
+        try {
+          const { data, error } = await supabaseClient
+            .from('app_state')
+            .select('data, updated_at')
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+          if (error) throw error;
+          if (!data) {
+            const { error: insertError } = await supabaseClient.from('app_state').insert({
+              user_id: currentUser.id,
+              data: state,
+              updated_at: new Date().toISOString()
+            });
+            if (insertError) throw insertError;
+          } else if (Array.isArray(data.data?.transactions) && Array.isArray(data.data?.utilities)) {
+            const remoteState = { transactions: data.data.transactions, utilities: data.data.utilities };
+            if (JSON.stringify(remoteState) !== JSON.stringify(state)) {
+              state = remoteState;
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+              renderAll();
+            }
+          }
+          setSyncStatus('Sincronizzato');
+        } catch (error) {
+          console.error(error);
+          setSyncStatus('Offline', true);
+        } finally {
+          remoteSyncBusy = false;
+        }
+      }
+
+      function showAuth(message = '') {
+        currentUser = null;
+        $('#logout-button').hidden = true;
+        $('#account-email').textContent = '';
+        $('#auth-message').textContent = message;
+        $('#auth-message').classList.remove('error');
+        setSyncStatus('Accesso richiesto');
+        if (!$('#auth-dialog').open) $('#auth-dialog').showModal();
+      }
+
+      async function handleAuthenticated(user) {
+        currentUser = user;
+        $('#account-email').textContent = user.email || '';
+        $('#logout-button').hidden = false;
+        if ($('#auth-dialog').open) $('#auth-dialog').close();
+        await pullRemoteState();
+      }
+
+      async function initializeAuth() {
+        if (!supabaseClient) {
+          showAuth('Impossibile caricare il servizio di sincronizzazione. Controlla la connessione.');
+          $('#auth-message').classList.add('error');
+          return;
+        }
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error) {
+          showAuth(error.message);
+          $('#auth-message').classList.add('error');
+        } else if (data.session?.user) {
+          await handleAuthenticated(data.session.user);
+        } else {
+          showAuth();
+        }
+        supabaseClient.auth.onAuthStateChange((event, session) => {
+          if (event === 'SIGNED_OUT' || !session?.user) showAuth();
+        });
       }
 
       function setView(viewName) {
@@ -1057,8 +1212,59 @@
         if (event.target === dialog) dialog.close();
       }));
 
+      $('#auth-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const email = $('#auth-email').value.trim();
+        const password = $('#auth-password').value;
+        $('#auth-message').textContent = 'Accesso in corso...';
+        $('#auth-message').classList.remove('error');
+        const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+        if (error) {
+          $('#auth-message').textContent = error.message;
+          $('#auth-message').classList.add('error');
+          return;
+        }
+        await handleAuthenticated(data.user);
+      });
+
+      $('#signup-button').addEventListener('click', async () => {
+        const email = $('#auth-email').value.trim();
+        const password = $('#auth-password').value;
+        if (!email || password.length < 8) {
+          $('#auth-message').textContent = 'Inserisci un’email valida e una password di almeno 8 caratteri.';
+          $('#auth-message').classList.add('error');
+          return;
+        }
+        $('#auth-message').textContent = 'Creazione account...';
+        $('#auth-message').classList.remove('error');
+        const { data, error } = await supabaseClient.auth.signUp({
+          email,
+          password,
+          options: { emailRedirectTo: window.location.href.split('#')[0] }
+        });
+        if (error) {
+          $('#auth-message').textContent = error.message;
+          $('#auth-message').classList.add('error');
+        } else if (data.session?.user) {
+          await handleAuthenticated(data.session.user);
+        } else {
+          $('#auth-message').textContent = 'Controlla la tua email e conferma l’account, poi torna qui per accedere.';
+        }
+      });
+
+      $('#logout-button').addEventListener('click', async () => {
+        if (localDirty) await pushRemoteState();
+        await supabaseClient.auth.signOut();
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') pullRemoteState();
+      });
+      setInterval(pullRemoteState, 15000);
+
       updateTransactionFormMode('income');
       renderAll();
+      initializeAuth();
     })();
   </script>
 </body>
