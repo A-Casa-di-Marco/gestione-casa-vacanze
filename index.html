@@ -565,8 +565,12 @@
 
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
-      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v2';
+      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v3';
       const incomeTransactions = [
+        ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '', '', 'posted', 'Guadagni Airbnb - gennaio 2026'],
+        ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '', '', 'posted', 'Guadagni Airbnb - marzo 2026'],
+        ['report-airbnb-monthly-202605', 'Airbnb', 225.88, '2026-05-31', '', '', 'posted', 'Guadagni Airbnb - maggio 2026'],
+        ['report-airbnb-monthly-202606', 'Airbnb', 544.36, '2026-06-20', '', '', 'posted', 'Guadagni Airbnb già corrisposti - giugno 2026'],
         ['report-booking-20260101-01', 'Booking', 60.43, '2026-01-01', '2025-12-27', '2025-12-28'],
         ['report-booking-20260101-02', 'Booking', 164.43, '2026-01-01', '2025-12-29', '2025-12-31'],
         ['report-booking-20260326-01', 'Booking', 191.31, '2026-03-26', '2026-03-21', '2026-03-25'],
@@ -576,13 +580,13 @@
         ['report-booking-20260423-02', 'Booking', 62.69, '2026-04-23', '2026-04-17', '2026-04-18'],
         ['report-booking-20260528-01', 'Booking', 286.50, '2026-05-28', '2026-05-19', '2026-05-23'],
         ['report-booking-20260604-01', 'Booking', 533.43, '2026-06-04', '2026-05-26', '2026-05-31'],
-        ['report-airbnb-20260620-01', 'Airbnb', 860.99, '2026-06-20', '2026-06-19', '2026-06-30'],
-        ['report-airbnb-20260720-01', 'Airbnb', 713.02, '2026-07-20', '2026-07-19', '2026-07-27'],
-        ['report-airbnb-20260804-01', 'Airbnb', 607.61, '2026-08-04', '2026-08-03', '2026-08-10'],
-        ['report-airbnb-20260917-01', 'Airbnb', 465.60, '2026-09-17', '2026-09-16', '2026-09-21']
-      ].map(([id, platform, amount, date, checkin, checkout], index) => ({
+        ['report-airbnb-20260620-01', 'Airbnb', 860.99, '2026-06-20', '2026-06-19', '2026-06-30', 'planned'],
+        ['report-airbnb-20260720-01', 'Airbnb', 713.02, '2026-07-20', '2026-07-19', '2026-07-27', 'planned'],
+        ['report-airbnb-20260804-01', 'Airbnb', 607.61, '2026-08-04', '2026-08-03', '2026-08-10', 'planned'],
+        ['report-airbnb-20260917-01', 'Airbnb', 465.60, '2026-09-17', '2026-09-16', '2026-09-21', 'planned']
+      ].map(([id, platform, amount, date, checkin, checkout, status = 'posted', description], index) => ({
         id, type: 'income', amount, date, category: platform, method: platform,
-        description: `Soggiorno ${platform}`, notes: '', guests: null, checkin, checkout,
+        description: description || `Soggiorno ${platform}`, notes: '', guests: null, checkin, checkout, status,
         createdAt: new Date(`${date}T12:00:00`).getTime() + index
       }));
       const billTransactions = [
@@ -628,6 +632,7 @@
         if (transaction.checkin && transaction.checkout) parts.push(`${formatDate(transaction.checkin)} - ${formatDate(transaction.checkout)}`);
         return parts.join(' · ');
       };
+      const isPosted = transaction => transaction.date <= today && (transaction.status !== 'planned' || transaction.date < today);
 
       function loadState() {
         try {
@@ -648,10 +653,12 @@
             const excludedOldBills = new Set(['bill-gas-2025-07-16-vacation', 'bill-water-2025-09-03-vacation']);
             loaded.transactions = loaded.transactions.filter(item => !excludedOldBills.has(item.id));
             incomeTransactions.forEach(income => {
-              const duplicate = loaded.transactions.some(item =>
-                item.id === income.id ||
-                (item.type === 'income' && item.category === income.category && Number(item.amount) === income.amount && item.date === income.date && item.checkin === income.checkin && item.checkout === income.checkout)
-              );
+              const existingIndex = loaded.transactions.findIndex(item => item.id === income.id);
+              if (existingIndex >= 0) {
+                loaded.transactions[existingIndex] = { ...loaded.transactions[existingIndex], ...income };
+                return;
+              }
+              const duplicate = loaded.transactions.some(item => item.type === 'income' && item.category === income.category && Number(item.amount) === income.amount && item.date === income.date && item.checkin === income.checkin && item.checkout === income.checkout);
               if (!duplicate) loaded.transactions.push(income);
             });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
@@ -731,19 +738,19 @@
 
       function renderHome() {
         const selectedMonth = $('#home-month').value || currentMonth;
-        const postedTransactions = state.transactions.filter(t => (!t.date || t.date <= today) && (!t.date || t.date >= ACCOUNTING_START));
+        const postedTransactions = state.transactions.filter(t => (!t.date || t.date <= today) && (!t.date || t.date >= ACCOUNTING_START) && isPosted(t));
         const allIncome = postedTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
         const allExpense = postedTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
         const balance = allIncome - allExpense;
         const balanceEl = $('#balance-total');
         balanceEl.textContent = euro.format(balance);
         balanceEl.className = `balance-value ${balance > 0 ? 'positive' : balance < 0 ? 'negative' : 'neutral'}`;
-        const futureCount = state.transactions.filter(t => t.date >= ACCOUNTING_START && t.date > today).length;
+        const futureCount = state.transactions.filter(t => t.date >= ACCOUNTING_START && !isPosted(t)).length;
         $('#balance-note').textContent = state.transactions.length
           ? `${postedTransactions.length} movimenti contabilizzati${futureCount ? ` · ${futureCount} in programma` : ''}`
           : 'Aggiungi il primo movimento per iniziare.';
 
-        const monthItems = state.transactions.filter(t => t.date.startsWith(selectedMonth) && (selectedMonth !== currentMonth || t.date <= today));
+        const monthItems = state.transactions.filter(t => t.date.startsWith(selectedMonth) && (selectedMonth !== currentMonth || isPosted(t)));
         const income = monthItems.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
         const expense = monthItems.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
         const result = income - expense;
@@ -787,7 +794,7 @@
 
         $('#movements-table').innerHTML = filtered.map(t => `
           <tr>
-            <td>${formatDate(t.date)}</td><td><span class="tag ${t.type}">${t.date > today ? 'In programma' : (t.type === 'income' ? 'Entrata' : 'Uscita')}</span></td>
+            <td>${formatDate(t.date)}</td><td><span class="tag ${t.type}">${!isPosted(t) ? 'In programma' : (t.type === 'income' ? 'Entrata' : 'Uscita')}</span></td>
             <td><strong>${escapeHtml(t.description)}</strong>${t.method ? `<br><small>${escapeHtml(t.method)}</small>` : ''}${staySummary(t) ? `<br><small>${staySummary(t)}</small>` : ''}</td>
             <td>${escapeHtml(t.category)}</td><td class="amount ${t.type}">${t.type === 'income' ? '+' : '−'} ${euro.format(t.amount)}</td>
             <td><div class="row-actions"><button class="edit-button" data-edit-transaction="${t.id}">Modifica</button><button class="delete-icon" data-delete-transaction="${t.id}" aria-label="Elimina movimento" title="Elimina">×</button></div></td>
