@@ -565,9 +565,9 @@
 
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
-      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v7';
+      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v8';
       const incomeTransactions = [
-        ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '', '', 'posted', 'Guadagni Airbnb - gennaio 2026', 3],
+        ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '2026-01-03', '2026-01-04', 'posted', 'Guadagni Airbnb - gennaio 2026', 3],
         ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '2026-03-19', '2026-03-21', 'posted', 'Guadagni Airbnb - marzo 2026', 3],
         ['report-airbnb-monthly-202605', 'Airbnb', 225.88, '2026-05-31', '2026-04-30', '2026-05-03', 'posted', 'Guadagni Airbnb - maggio 2026', 4],
         ['report-airbnb-monthly-202606', 'Airbnb', 544.36, '2026-06-20', '2026-05-31', '2026-06-09', 'posted', 'Guadagni Airbnb già corrisposti - giugno 2026', 2],
@@ -647,6 +647,7 @@
         };
       });
       const additionalTouristTaxes = [
+        ['tourist-tax-20260103-04', 7.50, '2026-01-04', '2026-01-03', '2026-01-04', 3, '3 adulti × 1 notte × 2,50 €'],
         ['tourist-tax-20260319-21', 10.00, '2026-03-21', '2026-03-19', '2026-03-21', 2, '2 adulti × 2 notti × 2,50 €'],
         ['tourist-tax-20260321-25', 20.00, '2026-03-25', '2026-03-21', '2026-03-25', 2, '2 adulti × 4 notti × 2,50 €'],
         ['tourist-tax-20260401-02', 12.50, '2026-04-02', '2026-04-01', '2026-04-02', 5, '5 adulti × 1 notte × 2,50 €; bambino di 10 anni escluso'],
