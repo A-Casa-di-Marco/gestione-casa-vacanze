@@ -203,6 +203,18 @@
     .transaction-amount { font-weight: 850; white-space: nowrap; }
     .transaction-amount.income { color: var(--income); }
     .transaction-amount.expense { color: var(--expense); }
+    .row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+    .edit-button {
+      min-height: 34px;
+      border: 0;
+      border-radius: 7px;
+      padding: 6px 9px;
+      color: var(--brand);
+      background: var(--brand-soft);
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .edit-button:hover { color: #fff; background: var(--brand); }
     .delete-icon {
       display: grid;
       place-items: center;
@@ -276,6 +288,18 @@
     .form-field { display: grid; gap: 6px; }
     .form-field.full { grid-column: 1 / -1; }
     .form-field label { font-size: 13px; font-weight: 800; }
+    .stay-fields {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      grid-column: 1 / -1;
+      gap: 14px;
+      padding: 14px;
+      background: var(--income-soft);
+      border: 1px solid #cbe8d8;
+      border-radius: 7px;
+    }
+    .stay-fields[hidden] { display: none; }
+    .stay-fields-title { grid-column: 1 / -1; margin: 0; color: var(--income); font-size: 13px; font-weight: 850; }
     .type-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .type-switch input { position: absolute; opacity: 0; pointer-events: none; }
     .type-switch label { padding: 11px; border: 2px solid var(--line); border-radius: 7px; text-align: center; cursor: pointer; }
@@ -337,6 +361,8 @@
     @media (max-width: 560px) {
       .form-grid { grid-template-columns: 1fr; }
       .form-field.full { grid-column: auto; }
+      .stay-fields { grid-template-columns: 1fr; grid-column: auto; }
+      .stay-fields-title { grid-column: auto; }
       .filter-bar { grid-template-columns: 1fr; }
       .filter-bar input[type="search"] { grid-column: auto; }
       .transaction-row { grid-template-columns: auto minmax(0,1fr) auto; }
@@ -447,8 +473,8 @@
         <div class="settings-grid">
           <section class="panel">
             <h2>Backup completo</h2>
-            <p>I dati sono salvati soltanto in questo browser. Scarica periodicamente una copia per non perderli cambiando telefono o cancellando la cronologia.</p>
-            <div class="settings-actions"><button class="button" id="export-json">Scarica backup</button><label class="button secondary" for="import-json">Importa backup</label><input id="import-json" type="file" accept="application/json" hidden></div>
+            <p>I dati sono salvati soltanto in questo browser. Scarica periodicamente una copia per non perderli. L'importazione aggiunge i dati mancanti senza cancellare quelli presenti.</p>
+            <div class="settings-actions"><button class="button" id="export-json">Scarica backup</button><label class="button secondary" for="import-json">Importa dati</label><input id="import-json" type="file" accept="application/json" hidden></div>
           </section>
           <section class="panel">
             <h2>Esporta movimenti</h2>
@@ -474,7 +500,7 @@
 
   <dialog id="transaction-dialog">
     <form id="transaction-form">
-      <div class="dialog-header"><h2>Nuovo movimento</h2><button type="button" class="dialog-close" data-close-dialog aria-label="Chiudi">×</button></div>
+      <div class="dialog-header"><h2 id="transaction-dialog-title">Nuovo movimento</h2><button type="button" class="dialog-close" data-close-dialog aria-label="Chiudi">×</button></div>
       <div class="dialog-body">
         <div class="form-grid">
           <div class="form-field full">
@@ -489,6 +515,12 @@
           <div class="form-field"><label for="transaction-category-input">Categoria</label><select id="transaction-category-input" required></select></div>
           <div class="form-field"><label for="transaction-method">Metodo</label><select id="transaction-method"><option>Contanti</option><option>Bonifico</option><option>Carta</option><option>Booking</option><option>Airbnb</option><option>Altro</option></select></div>
           <div class="form-field full"><label for="transaction-description">Descrizione</label><input id="transaction-description" maxlength="100" placeholder="Es. Soggiorno 12-15 giugno" required></div>
+          <div class="stay-fields" id="stay-fields">
+            <p class="stay-fields-title">Dati del soggiorno (facoltativi)</p>
+            <div class="form-field"><label for="transaction-guests">Numero ospiti</label><input id="transaction-guests" type="number" min="1" step="1" inputmode="numeric" placeholder="Es. 3"></div>
+            <div class="form-field"><label for="transaction-checkin">Check-in</label><input id="transaction-checkin" type="date"></div>
+            <div class="form-field"><label for="transaction-checkout">Check-out</label><input id="transaction-checkout" type="date"></div>
+          </div>
           <div class="form-field full"><label for="transaction-notes">Note (facoltative)</label><textarea id="transaction-notes" maxlength="300"></textarea></div>
         </div>
         <div class="dialog-actions"><button type="button" class="button secondary" data-close-dialog>Annulla</button><button type="submit" class="button">Salva movimento</button></div>
@@ -522,8 +554,8 @@
 
       const STORAGE_KEY = 'a-casa-di-marco-manager-v1';
       const categories = {
-        income: ['Prenotazione diretta', 'Booking', 'Airbnb', 'Servizio a ore', 'Extra', 'Altro'],
-        expense: ['Pulizie', 'Lavanderia', 'Utenze', 'Manutenzione', 'Commissioni', 'Tasse', 'Forniture', 'Colazione', 'Altro']
+        income: ['Prenotazione diretta', 'Booking', 'Airbnb', 'Servizio a ore', 'Tassa di soggiorno', 'Extra', 'Altro'],
+        expense: ['Pulizie', 'Lavanderia', 'Utenze', 'Manutenzione', 'Commissioni', 'Tasse', 'Tassa di soggiorno', 'Forniture', 'Colazione', 'Altro']
       };
       const utilityInfo = {
         water: { label: 'Acqua', unit: 'm³' },
@@ -532,6 +564,7 @@
       };
 
       let state = loadState();
+      let editingTransactionId = null;
       const euro = new Intl.NumberFormat('it-IT', { style: 'currency', currency: 'EUR' });
       const number = new Intl.NumberFormat('it-IT', { maximumFractionDigits: 3 });
       const today = new Date().toISOString().slice(0, 10);
@@ -541,6 +574,12 @@
       const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
       const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, char => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[char]));
       const formatDate = value => new Intl.DateTimeFormat('it-IT').format(new Date(value + 'T12:00:00'));
+      const staySummary = transaction => {
+        const parts = [];
+        if (transaction.guests) parts.push(`${transaction.guests} ${Number(transaction.guests) === 1 ? 'ospite' : 'ospiti'}`);
+        if (transaction.checkin && transaction.checkout) parts.push(`${formatDate(transaction.checkin)} - ${formatDate(transaction.checkout)}`);
+        return parts.join(' · ');
+      };
 
       function loadState() {
         try {
@@ -578,11 +617,34 @@
         $('#transaction-category-input').innerHTML = categories[type].map(item => `<option>${escapeHtml(item)}</option>`).join('');
       }
 
-      function openTransaction(type) {
-        $('#transaction-form').reset();
-        $(`#type-${type}`).checked = true;
-        $('#transaction-date').value = today;
+      function updateTransactionFormMode(type, selectedCategory = '') {
         updateCategoryOptions(type);
+        if (selectedCategory && !categories[type].includes(selectedCategory)) {
+          $('#transaction-category-input').insertAdjacentHTML('beforeend', `<option>${escapeHtml(selectedCategory)}</option>`);
+        }
+        if (selectedCategory) $('#transaction-category-input').value = selectedCategory;
+        $('#stay-fields').hidden = type !== 'income';
+      }
+
+      function openTransaction(type, transaction = null) {
+        $('#transaction-form').reset();
+        editingTransactionId = transaction?.id || null;
+        $(`#type-${type}`).checked = true;
+        $('#transaction-dialog-title').textContent = transaction ? 'Modifica movimento' : 'Nuovo movimento';
+        $('#transaction-date').value = transaction?.date || today;
+        updateTransactionFormMode(type, transaction?.category || '');
+        if (transaction) {
+          $('#transaction-amount').value = transaction.amount;
+          $('#transaction-method').value = transaction.method || 'Contanti';
+          $('#transaction-description').value = transaction.description || '';
+          $('#transaction-notes').value = transaction.notes || '';
+          $('#transaction-guests').value = transaction.guests || '';
+          $('#transaction-checkin').value = transaction.checkin || '';
+          $('#transaction-checkout').value = transaction.checkout || '';
+          $('#transaction-checkout').min = transaction.checkin || '';
+        } else {
+          $('#transaction-checkout').min = '';
+        }
         $('#transaction-dialog').showModal();
         setTimeout(() => $('#transaction-amount').focus(), 50);
       }
@@ -595,15 +657,19 @@
 
       function renderHome() {
         const selectedMonth = $('#home-month').value || currentMonth;
-        const allIncome = state.transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
-        const allExpense = state.transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+        const postedTransactions = state.transactions.filter(t => !t.date || t.date <= today);
+        const allIncome = postedTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+        const allExpense = postedTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
         const balance = allIncome - allExpense;
         const balanceEl = $('#balance-total');
         balanceEl.textContent = euro.format(balance);
         balanceEl.className = `balance-value ${balance > 0 ? 'positive' : balance < 0 ? 'negative' : 'neutral'}`;
-        $('#balance-note').textContent = state.transactions.length ? `${state.transactions.length} movimenti registrati complessivamente` : 'Aggiungi il primo movimento per iniziare.';
+        const futureCount = state.transactions.filter(t => t.date > today).length;
+        $('#balance-note').textContent = state.transactions.length
+          ? `${postedTransactions.length} movimenti contabilizzati${futureCount ? ` · ${futureCount} in programma` : ''}`
+          : 'Aggiungi il primo movimento per iniziare.';
 
-        const monthItems = state.transactions.filter(t => t.date.startsWith(selectedMonth));
+        const monthItems = state.transactions.filter(t => t.date.startsWith(selectedMonth) && (selectedMonth !== currentMonth || t.date <= today));
         const income = monthItems.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
         const expense = monthItems.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
         const result = income - expense;
@@ -612,7 +678,7 @@
         $('#period-result').textContent = euro.format(result);
         $('#period-result').style.color = result > 0 ? 'var(--income)' : result < 0 ? 'var(--expense)' : 'var(--text)';
 
-        const recent = [...state.transactions].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt).slice(0, 6);
+        const recent = [...postedTransactions].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt).slice(0, 6);
         $('#recent-list').innerHTML = recent.length ? recent.map(t => `
           <div class="transaction-row">
             <span class="type-dot ${t.type}"></span>
@@ -647,10 +713,10 @@
 
         $('#movements-table').innerHTML = filtered.map(t => `
           <tr>
-            <td>${formatDate(t.date)}</td><td><span class="tag ${t.type}">${t.type === 'income' ? 'Entrata' : 'Uscita'}</span></td>
-            <td><strong>${escapeHtml(t.description)}</strong>${t.method ? `<br><small>${escapeHtml(t.method)}</small>` : ''}</td>
+            <td>${formatDate(t.date)}</td><td><span class="tag ${t.type}">${t.date > today ? 'In programma' : (t.type === 'income' ? 'Entrata' : 'Uscita')}</span></td>
+            <td><strong>${escapeHtml(t.description)}</strong>${t.method ? `<br><small>${escapeHtml(t.method)}</small>` : ''}${staySummary(t) ? `<br><small>${staySummary(t)}</small>` : ''}</td>
             <td>${escapeHtml(t.category)}</td><td class="amount ${t.type}">${t.type === 'income' ? '+' : '−'} ${euro.format(t.amount)}</td>
-            <td><button class="delete-icon" data-delete-transaction="${t.id}" aria-label="Elimina movimento" title="Elimina">×</button></td>
+            <td><div class="row-actions"><button class="edit-button" data-edit-transaction="${t.id}">Modifica</button><button class="delete-icon" data-delete-transaction="${t.id}" aria-label="Elimina movimento" title="Elimina">×</button></div></td>
           </tr>`).join('');
         $('#movements-empty').hidden = filtered.length > 0;
       }
@@ -684,7 +750,11 @@
       $$('[data-go]').forEach(button => button.addEventListener('click', () => setView(button.dataset.go)));
       $$('[data-add-transaction]').forEach(button => button.addEventListener('click', () => openTransaction(button.dataset.addTransaction)));
       $$('[data-close-dialog]').forEach(button => button.addEventListener('click', () => button.closest('dialog').close()));
-      $$('input[name="transaction-type"]').forEach(input => input.addEventListener('change', () => updateCategoryOptions(input.value)));
+      $$('input[name="transaction-type"]').forEach(input => input.addEventListener('change', () => updateTransactionFormMode(input.value)));
+      $('#transaction-checkin').addEventListener('change', event => {
+        $('#transaction-checkout').min = event.target.value;
+        if ($('#transaction-checkout').value && $('#transaction-checkout').value < event.target.value) $('#transaction-checkout').value = '';
+      });
 
       $('#home-month').value = currentMonth;
       $('#home-month').addEventListener('change', renderHome);
@@ -693,8 +763,19 @@
       $('#transaction-form').addEventListener('submit', event => {
         event.preventDefault();
         const type = $('input[name="transaction-type"]:checked').value;
-        state.transactions.push({
-          id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
+        const checkin = type === 'income' ? $('#transaction-checkin').value : '';
+        const checkout = type === 'income' ? $('#transaction-checkout').value : '';
+        if ((checkin && !checkout) || (!checkin && checkout)) {
+          alert('Inserisci sia il check-in sia il check-out, oppure lascia entrambe le date vuote.');
+          return;
+        }
+        if (checkin && checkout && checkout < checkin) {
+          alert('La data di check-out non può essere precedente al check-in.');
+          return;
+        }
+        const existing = state.transactions.find(t => t.id === editingTransactionId);
+        const transaction = {
+          id: editingTransactionId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
           type,
           amount: Number($('#transaction-amount').value),
           date: $('#transaction-date').value,
@@ -702,10 +783,20 @@
           method: $('#transaction-method').value,
           description: $('#transaction-description').value.trim(),
           notes: $('#transaction-notes').value.trim(),
-          createdAt: Date.now()
-        });
+          guests: type === 'income' ? (Number($('#transaction-guests').value) || null) : null,
+          checkin,
+          checkout,
+          createdAt: existing?.createdAt || Date.now(),
+          updatedAt: editingTransactionId ? Date.now() : null
+        };
+        if (editingTransactionId) {
+          state.transactions = state.transactions.map(t => t.id === editingTransactionId ? transaction : t);
+        } else {
+          state.transactions.push(transaction);
+        }
         $('#transaction-dialog').close();
-        saveState(type === 'income' ? 'Entrata salvata' : 'Uscita salvata');
+        saveState(editingTransactionId ? 'Movimento modificato' : (type === 'income' ? 'Entrata salvata' : 'Uscita salvata'));
+        editingTransactionId = null;
       });
 
       $('#add-utility').addEventListener('click', () => {
@@ -732,8 +823,13 @@
       });
 
       document.addEventListener('click', event => {
+        const editButton = event.target.closest('[data-edit-transaction]');
         const transactionButton = event.target.closest('[data-delete-transaction]');
         const utilityButton = event.target.closest('[data-delete-utility]');
+        if (editButton) {
+          const transaction = state.transactions.find(t => t.id === editButton.dataset.editTransaction);
+          if (transaction) openTransaction(transaction.type, transaction);
+        }
         if (transactionButton && confirm('Vuoi eliminare questo movimento?')) {
           state.transactions = state.transactions.filter(t => t.id !== transactionButton.dataset.deleteTransaction);
           saveState('Movimento eliminato');
@@ -751,9 +847,16 @@
         try {
           const imported = JSON.parse(await file.text());
           if (!Array.isArray(imported.transactions) || !Array.isArray(imported.utilities)) throw new Error('Formato non valido');
-          if (confirm('Il backup sostituirà i dati presenti. Vuoi continuare?')) {
-            state = { transactions: imported.transactions, utilities: imported.utilities };
-            saveState('Backup importato');
+          if (confirm('I nuovi dati verranno aggiunti senza eliminare quelli presenti. Vuoi continuare?')) {
+            const transactionIds = new Set(state.transactions.map(item => item.id));
+            const utilityIds = new Set(state.utilities.map(item => item.id));
+            const newTransactions = imported.transactions.filter(item => item?.id && !transactionIds.has(item.id));
+            const newUtilities = imported.utilities.filter(item => item?.id && !utilityIds.has(item.id));
+            state = {
+              transactions: [...state.transactions, ...newTransactions],
+              utilities: [...state.utilities, ...newUtilities]
+            };
+            saveState(`${newTransactions.length + newUtilities.length} nuove voci importate`);
           }
         } catch (_) { alert('Il file selezionato non è un backup valido.'); }
         event.target.value = '';
@@ -761,7 +864,7 @@
 
       $('#export-csv').addEventListener('click', () => {
         const quote = value => `"${String(value ?? '').replace(/"/g, '""')}"`;
-        const rows = [['Data','Tipo','Descrizione','Categoria','Metodo','Importo','Note'], ...state.transactions.map(t => [t.date, t.type === 'income' ? 'Entrata' : 'Uscita', t.description, t.category, t.method, Number(t.amount).toFixed(2), t.notes])];
+        const rows = [['Data','Tipo','Descrizione','Categoria','Metodo','Importo','Ospiti','Check-in','Check-out','Note'], ...state.transactions.map(t => [t.date, t.type === 'income' ? 'Entrata' : 'Uscita', t.description, t.category, t.method, Number(t.amount).toFixed(2), t.guests || '', t.checkin || '', t.checkout || '', t.notes])];
         download(`movimenti-casa-vacanze-${today}.csv`, '\ufeff' + rows.map(row => row.map(quote).join(';')).join('\n'), 'text/csv;charset=utf-8');
       });
 
@@ -776,7 +879,7 @@
         if (event.target === dialog) dialog.close();
       }));
 
-      updateCategoryOptions('income');
+      updateTransactionFormMode('income');
       renderAll();
     })();
   </script>
