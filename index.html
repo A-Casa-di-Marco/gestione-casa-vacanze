@@ -555,7 +555,7 @@
       const STORAGE_KEY = 'a-casa-di-marco-manager-v1';
       const categories = {
         income: ['Prenotazione diretta', 'Booking', 'Airbnb', 'Servizio a ore', 'Tassa di soggiorno', 'Extra', 'Altro'],
-        expense: ['Pulizie', 'Lavanderia', 'Utenze', 'Manutenzione', 'Commissioni', 'Tasse', 'Tassa di soggiorno', 'Forniture', 'Colazione', 'Altro']
+        expense: ['Pulizie', 'Lavanderia', 'Utenze', 'Internet', 'Rimborsi', 'Manutenzione', 'Commissioni', 'Tasse', 'Tassa di soggiorno', 'Forniture', 'Colazione', 'Altro']
       };
       const utilityInfo = {
         water: { label: 'Acqua', unit: 'm³' },
@@ -565,7 +565,7 @@
 
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
-      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v3';
+      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v4';
       const incomeTransactions = [
         ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '', '', 'posted', 'Guadagni Airbnb - gennaio 2026'],
         ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '', '', 'posted', 'Guadagni Airbnb - marzo 2026'],
@@ -579,14 +579,14 @@
         ['report-booking-20260423-01', 'Booking', 70.67, '2026-04-23', '2026-04-15', '2026-04-16'],
         ['report-booking-20260423-02', 'Booking', 62.69, '2026-04-23', '2026-04-17', '2026-04-18'],
         ['report-booking-20260528-01', 'Booking', 286.50, '2026-05-28', '2026-05-19', '2026-05-23'],
-        ['report-booking-20260604-01', 'Booking', 533.43, '2026-06-04', '2026-05-26', '2026-05-31'],
+        ['report-booking-20260604-01', 'Booking', 533.43, '2026-06-04', '2026-05-26', '2026-05-31', 'posted', '', 3],
         ['report-airbnb-20260620-01', 'Airbnb', 860.99, '2026-06-20', '2026-06-19', '2026-06-30', 'planned'],
         ['report-airbnb-20260720-01', 'Airbnb', 713.02, '2026-07-20', '2026-07-19', '2026-07-27', 'planned'],
         ['report-airbnb-20260804-01', 'Airbnb', 607.61, '2026-08-04', '2026-08-03', '2026-08-10', 'planned'],
         ['report-airbnb-20260917-01', 'Airbnb', 465.60, '2026-09-17', '2026-09-16', '2026-09-21', 'planned']
-      ].map(([id, platform, amount, date, checkin, checkout, status = 'posted', description], index) => ({
+      ].map(([id, platform, amount, date, checkin, checkout, status = 'posted', description, guests = null], index) => ({
         id, type: 'income', amount, date, category: platform, method: platform,
-        description: description || `Soggiorno ${platform}`, notes: '', guests: null, checkin, checkout, status,
+        description: description || `Soggiorno ${platform}`, notes: '', guests, checkin, checkout, status,
         createdAt: new Date(`${date}T12:00:00`).getTime() + index
       }));
       const billTransactions = [
@@ -597,6 +597,48 @@
           guests: null, checkin: '', checkout: '', createdAt: 1783382400001
         }
       ];
+      const manualTransactions = [
+        {
+          id: 'manual-prisca-late-checkout-20260620', type: 'income', amount: 20.00,
+          date: '2026-06-20', category: 'Extra', method: 'Contanti',
+          description: 'Late check-out Prisca', notes: 'Data da confermare',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1781956800101
+        },
+        {
+          id: 'manual-direct-20260613', type: 'income', amount: 50.00,
+          date: '2026-06-13', category: 'Prenotazione diretta', method: 'Da confermare',
+          description: 'Prenotazione diretta del 13 giugno', notes: '2 ospiti; check-out da completare',
+          guests: 2, checkin: '', checkout: '', status: 'posted', createdAt: 1781265600102
+        },
+        {
+          id: 'manual-extra-guest-20260519-23', type: 'income', amount: 80.00,
+          date: '2026-05-23', category: 'Extra', method: 'Da confermare',
+          description: 'Supplemento per persona in più', notes: '',
+          guests: 1, checkin: '2026-05-19', checkout: '2026-05-23', status: 'posted', createdAt: 1779494400103
+        },
+        {
+          id: 'manual-refund-20260620', type: 'expense', amount: 25.00,
+          date: '2026-06-20', category: 'Rimborsi', method: 'Da confermare',
+          description: 'Rimborso emesso', notes: 'Data da confermare',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1781956800104
+        },
+        {
+          id: 'manual-breakfast-20260526-31', type: 'expense', amount: 37.50,
+          date: '2026-05-31', category: 'Colazione', method: 'Contanti',
+          description: 'Colazioni soggiorno 26-31 maggio', notes: '3 ospiti × 5 colazioni × 2,50 €',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1780185600105
+        }
+      ];
+      const internetTransactions = Array.from({ length: 12 }, (_, index) => {
+        const month = String(index + 1).padStart(2, '0');
+        return {
+          id: `internet-2026-${month}`, type: 'expense', amount: 6.00,
+          date: `2026-${month}-01`, category: 'Internet', method: 'Addebito automatico',
+          description: `Internet ${month}/2026`, notes: '', guests: null,
+          checkin: '', checkout: '', status: 'posted', createdAt: new Date(`2026-${month}-01T12:00:00`).getTime()
+        };
+      });
+      const seedTransactions = [...incomeTransactions, ...manualTransactions, ...internetTransactions, ...billTransactions];
       const billUtilities = [
         {
           id: 'usage-gas-2025-05-06-vacation', type: 'gas', date: '2025-06-30',
@@ -650,23 +692,40 @@
             localStorage.setItem(BILL_SEED_KEY, 'imported');
           }
           if (!localStorage.getItem(DATA_MIGRATION_KEY)) {
-            const excludedOldBills = new Set(['bill-gas-2025-07-16-vacation', 'bill-water-2025-09-03-vacation']);
-            loaded.transactions = loaded.transactions.filter(item => !excludedOldBills.has(item.id));
-            incomeTransactions.forEach(income => {
-              const existingIndex = loaded.transactions.findIndex(item => item.id === income.id);
+            loaded.transactions = loaded.transactions.filter(item => !item.date || item.date >= ACCOUNTING_START);
+            loaded.utilities = loaded.utilities.filter(item => !item.date || item.date >= ACCOUNTING_START);
+            seedTransactions.forEach(seed => {
+              const existingIndex = loaded.transactions.findIndex(item => item.id === seed.id);
               if (existingIndex >= 0) {
-                loaded.transactions[existingIndex] = { ...loaded.transactions[existingIndex], ...income };
+                loaded.transactions[existingIndex] = { ...loaded.transactions[existingIndex], ...seed };
                 return;
               }
-              const duplicate = loaded.transactions.some(item => item.type === 'income' && item.category === income.category && Number(item.amount) === income.amount && item.date === income.date && item.checkin === income.checkin && item.checkout === income.checkout);
-              if (!duplicate) loaded.transactions.push(income);
+              const duplicate = loaded.transactions.some(item => item.type === seed.type && item.category === seed.category && Number(item.amount) === seed.amount && item.date === seed.date && item.description === seed.description && item.checkin === seed.checkin && item.checkout === seed.checkout);
+              if (!duplicate) loaded.transactions.push(seed);
+            });
+            const seenTransactions = new Set();
+            loaded.transactions = loaded.transactions.filter(item => {
+              const signature = [item.type, item.date, item.category, Number(item.amount).toFixed(2), item.description || '', item.checkin || '', item.checkout || ''].join('|');
+              if (seenTransactions.has(signature)) return false;
+              seenTransactions.add(signature);
+              return true;
+            });
+            const seenUtilities = new Set();
+            loaded.utilities = loaded.utilities.filter(item => {
+              const signature = [item.type, item.date, Number(item.consumption), Number(item.cost), item.periodStart || '', item.periodEnd || ''].join('|');
+              if (seenUtilities.has(signature)) return false;
+              seenUtilities.add(signature);
+              return true;
             });
             localStorage.setItem(STORAGE_KEY, JSON.stringify(loaded));
             localStorage.setItem(DATA_MIGRATION_KEY, 'imported');
           }
           return loaded;
         } catch (_) {
-          const initial = { transactions: [...incomeTransactions, ...billTransactions], utilities: [...billUtilities] };
+          const initial = {
+            transactions: [...seedTransactions],
+            utilities: billUtilities.filter(item => !item.date || item.date >= ACCOUNTING_START)
+          };
           localStorage.setItem(STORAGE_KEY, JSON.stringify(initial));
           localStorage.setItem(BILL_SEED_KEY, 'imported');
           localStorage.setItem(DATA_MIGRATION_KEY, 'imported');
