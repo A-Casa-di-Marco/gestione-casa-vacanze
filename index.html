@@ -615,7 +615,7 @@
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
       const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v9';
-      const DATA_VERSION = 10;
+      const DATA_VERSION = 11;
       const incomeTransactions = [
         ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '2026-01-03', '2026-01-04', 'posted', 'Guadagni Airbnb - gennaio 2026', 3],
         ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '2026-03-19', '2026-03-21', 'posted', 'Guadagni Airbnb - marzo 2026', 3],
@@ -637,10 +637,49 @@
       }));
       const billTransactions = [
         {
+          id: 'bill-electricity-2026-01-share25', type: 'expense', amount: 165.07,
+          date: '2026-02-24', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Luce quota casa vacanze 25% - dic/gen',
+          notes: 'Totale bolletta 660,28 €; quota casa vacanze 25%; consumo stimato casa vacanze 564,5 kWh',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1771920000001
+        },
+        {
+          id: 'bill-water-2026-01-vacation', type: 'expense', amount: 44.00,
+          date: '2026-03-06', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Acqua casa vacanze - gennaio', notes: 'Fattura mista; consumo stimato imputato a gennaio',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1772755200001
+        },
+        {
+          id: 'bill-gas-2026-01-02-vacation', type: 'expense', amount: 107.96,
+          date: '2026-03-30', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Gas casa vacanze - gen/feb', notes: 'Consumo 57 Smc',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1774828800001
+        },
+        {
+          id: 'bill-electricity-2026-02-03-share25', type: 'expense', amount: 107.08,
+          date: '2026-04-24', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Luce quota casa vacanze 25% - feb/mar',
+          notes: 'Totale bolletta 428,32 €; quota casa vacanze 25%; consumo stimato casa vacanze 353 kWh',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1776988800001
+        },
+        {
+          id: 'bill-gas-2026-03-04-vacation', type: 'expense', amount: 144.62,
+          date: '2026-05-29', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Gas casa vacanze - mar/apr', notes: 'Consumo 83 Smc',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: 1780012800001
+        },
+        {
+          id: 'bill-electricity-2026-04-05-share25', type: 'expense', amount: 79.89,
+          date: '2026-06-26', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Luce quota casa vacanze 25% - apr/mag',
+          notes: 'Totale bolletta 319,54 €; quota casa vacanze 25%; consumo stimato casa vacanze 245,25 kWh',
+          guests: null, checkin: '', checkout: '', status: 'planned', createdAt: 1782432000001
+        },
+        {
           id: 'bill-water-2026-06-08-vacation', type: 'expense', amount: 12.00,
           date: '2026-07-07', category: 'Utenze', method: 'Addebito automatico',
-          description: 'Conguaglio acqua dicembre-maggio', notes: '',
-          guests: null, checkin: '', checkout: '', createdAt: 1783382400001
+          description: 'Conguaglio acqua dicembre-maggio', notes: 'Consumo effettivo 27 m³',
+          guests: null, checkin: '', checkout: '', status: 'planned', createdAt: 1783382400001
         }
       ];
       const manualTransactions = [
@@ -724,19 +763,59 @@
       const seedTransactions = [...incomeTransactions, ...manualTransactions, ...additionalTouristTaxes, ...internetTransactions, ...insuranceTransactions, ...billTransactions];
       const billUtilities = [
         {
-          id: 'usage-gas-2025-05-06-vacation', type: 'gas', date: '2025-06-30',
-          periodStart: '2025-05-01', periodEnd: '2025-06-30', consumption: 33,
-          cost: 81.18, people: null, days: 61, notes: 'Presenze ospiti da completare', createdAt: 1751241600001
+          id: 'utility-2026-01-electricity-share25', type: 'electricity', date: '2026-01-31',
+          periodStart: '2026-01-01', periodEnd: '2026-01-31', consumption: 282.25,
+          cost: 82.54, people: 3, days: 1, notes: 'Gennaio: 3 ospiti-notte; luce stimata al 25%', createdAt: 1769817600101
         },
         {
-          id: 'usage-water-2025-05-08-vacation', type: 'water', date: '2025-08-31',
-          periodStart: '2025-05-29', periodEnd: '2025-08-31', consumption: 23,
-          cost: 71.00, people: null, days: 95, notes: 'Presenze ospiti da completare', createdAt: 1756598400001
+          id: 'utility-2026-01-gas', type: 'gas', date: '2026-01-31',
+          periodStart: '2026-01-01', periodEnd: '2026-01-31', consumption: 28.5,
+          cost: 53.98, people: 3, days: 1, notes: 'Gennaio: 3 ospiti-notte', createdAt: 1769817600102
         },
         {
-          id: 'usage-water-2025-12-2026-05-vacation', type: 'water', date: '2026-05-27',
-          periodStart: '2025-12-19', periodEnd: '2026-05-27', consumption: 27,
-          cost: 12.00, people: null, days: 160, notes: 'Conguaglio: presenze ospiti da completare', createdAt: 1779840000001
+          id: 'utility-2026-01-water', type: 'water', date: '2026-01-31',
+          periodStart: '2026-01-01', periodEnd: '2026-01-31', consumption: 7.27,
+          cost: 21.31, people: 3, days: 1, notes: 'Gennaio: 3 ospiti-notte; quota stimata acqua', createdAt: 1769817600103
+        },
+        {
+          id: 'utility-2026-02-electricity-share25', type: 'electricity', date: '2026-02-28',
+          periodStart: '2026-02-01', periodEnd: '2026-02-28', consumption: 176.5,
+          cost: 53.54, people: null, days: 1, notes: 'Febbraio: nessun pernottamento registrato; luce stimata al 25%', createdAt: 1772236800101
+        },
+        {
+          id: 'utility-2026-02-gas', type: 'gas', date: '2026-02-28',
+          periodStart: '2026-02-01', periodEnd: '2026-02-28', consumption: 28.5,
+          cost: 53.98, people: null, days: 1, notes: 'Febbraio: nessun pernottamento registrato', createdAt: 1772236800102
+        },
+        {
+          id: 'utility-2026-03-electricity-share25', type: 'electricity', date: '2026-03-31',
+          periodStart: '2026-03-01', periodEnd: '2026-03-31', consumption: 176.5,
+          cost: 53.54, people: 14, days: 1, notes: 'Marzo: 14 ospiti-notte; luce stimata al 25%', createdAt: 1774915200101
+        },
+        {
+          id: 'utility-2026-03-gas', type: 'gas', date: '2026-03-31',
+          periodStart: '2026-03-01', periodEnd: '2026-03-31', consumption: 41.5,
+          cost: 72.31, people: 14, days: 1, notes: 'Marzo: 14 ospiti-notte', createdAt: 1774915200102
+        },
+        {
+          id: 'utility-2026-04-electricity-share25', type: 'electricity', date: '2026-04-30',
+          periodStart: '2026-04-01', periodEnd: '2026-04-30', consumption: 122.62,
+          cost: 39.94, people: 59, days: 1, notes: 'Aprile: 59 ospiti-notte; luce stimata al 25%', createdAt: 1777507200101
+        },
+        {
+          id: 'utility-2026-04-gas', type: 'gas', date: '2026-04-30',
+          periodStart: '2026-04-01', periodEnd: '2026-04-30', consumption: 41.5,
+          cost: 72.31, people: 59, days: 1, notes: 'Aprile: 59 ospiti-notte', createdAt: 1777507200102
+        },
+        {
+          id: 'utility-2026-05-electricity-share25', type: 'electricity', date: '2026-05-31',
+          periodStart: '2026-05-01', periodEnd: '2026-05-31', consumption: 122.63,
+          cost: 39.95, people: 53, days: 1, notes: 'Maggio: 53 ospiti-notte; luce stimata al 25%', createdAt: 1780185600101
+        },
+        {
+          id: 'utility-2026-05-water', type: 'water', date: '2026-05-31',
+          periodStart: '2026-05-01', periodEnd: '2026-05-31', consumption: 27,
+          cost: 12.00, people: 53, days: 1, notes: 'Maggio: 53 ospiti-notte; conguaglio acqua imputato a maggio', createdAt: 1780185600102
         }
       ];
 
@@ -755,7 +834,13 @@
           'tourist-tax-20260619-30'
         ]);
         migrated.transactions = migrated.transactions.filter(item => !removedFutureIncomeIds.has(item.id));
+        const removedOldUtilityIds = new Set([
+          'usage-gas-2025-05-06-vacation',
+          'usage-water-2025-05-08-vacation',
+          'usage-water-2025-12-2026-05-vacation'
+        ]);
         migrated.transactions = migrated.transactions.filter(item => !item.date || item.date >= ACCOUNTING_START);
+        migrated.utilities = migrated.utilities.filter(item => !removedOldUtilityIds.has(item.id));
         migrated.utilities = migrated.utilities.filter(item => !item.date || item.date >= ACCOUNTING_START);
 
         seedTransactions.forEach(seed => {
@@ -1096,7 +1181,9 @@
           const hasOccupancy = Number(item.people) > 0 && Number(item.days) > 0;
           const average = hasOccupancy ? Number(item.consumption) / (Number(item.people) * Number(item.days)) : null;
           const period = item.periodStart && item.periodEnd ? `<br><small>${formatDate(item.periodStart)} - ${formatDate(item.periodEnd)}</small>` : '';
-          return `<tr><td>${formatDate(item.date)}${period}</td><td><strong>${info.label}</strong></td><td>${number.format(item.consumption)} ${info.unit}</td><td>${item.people || '—'}</td><td>${item.days || '—'}</td><td>${average === null ? '<strong>Da completare</strong>' : `<strong>${number.format(average)}</strong> ${info.unit}`}</td><td>${item.cost ? euro.format(item.cost) : '—'}</td><td><button class="delete-icon" data-delete-utility="${item.id}" aria-label="Elimina consumo" title="Elimina">×</button></td></tr>`;
+          const costAverage = hasOccupancy && item.cost ? Number(item.cost) / (Number(item.people) * Number(item.days)) : null;
+          const costCell = item.cost ? `${euro.format(item.cost)}${costAverage === null ? '' : `<br><small>${euro.format(costAverage)} per ospite-notte</small>`}` : '—';
+          return `<tr><td>${formatDate(item.date)}${period}</td><td><strong>${info.label}</strong><br><small>${escapeHtml(item.notes || '')}</small></td><td>${number.format(item.consumption)} ${info.unit}</td><td>${item.people || '—'}</td><td>${item.days || '—'}</td><td>${average === null ? '<strong>Da completare</strong>' : `<strong>${number.format(average)}</strong> ${info.unit}/ospite-notte`}</td><td>${costCell}</td><td><button class="delete-icon" data-delete-utility="${item.id}" aria-label="Elimina consumo" title="Elimina">×</button></td></tr>`;
         }).join('');
         $('#utilities-empty').hidden = sorted.length > 0;
       }
