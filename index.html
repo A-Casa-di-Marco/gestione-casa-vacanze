@@ -277,6 +277,12 @@
     .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
     .settings-actions { display: flex; gap: 9px; flex-wrap: wrap; margin-top: 14px; }
     .notice { padding: 12px 14px; color: #40534c; background: var(--brand-soft); border-left: 4px solid var(--brand); border-radius: 5px; font-size: 13px; }
+    .monthly-grid { display: grid; gap: 16px; margin-top: 16px; }
+    .summary-kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 16px; }
+    .summary-kpi { padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
+    .summary-kpi span { display:block; color: var(--muted); font-size: 12px; font-weight: 800; }
+    .summary-kpi strong { display:block; margin-top: 6px; font-size: 21px; }
+    .setting-row { display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items:end; }
 
     .empty-state { padding: 38px 18px; color: var(--muted); text-align: center; }
     .empty-state strong { display: block; margin-bottom: 5px; color: var(--text); }
@@ -357,7 +363,7 @@
       .heading-actions > * { flex: 1; }
       .balance-panel { grid-template-columns: 1fr; }
       .balance-actions { justify-content: flex-start; }
-      .stats-grid, .utility-summary { grid-template-columns: 1fr; }
+      .stats-grid, .utility-summary, .summary-kpis { grid-template-columns: 1fr; }
       .dashboard-grid, .settings-grid { grid-template-columns: 1fr; }
       .filter-bar { grid-template-columns: 1fr 1fr; }
       .filter-bar input[type="search"] { grid-column: 1 / -1; }
@@ -493,6 +499,19 @@
           </table>
           <div class="empty-state" id="utilities-empty"><strong>Nessun consumo registrato</strong>Inserisci acqua, luce o gas per calcolare le medie.</div>
         </section>
+        <div class="summary-kpis">
+          <article class="summary-kpi"><span>Spese totali</span><strong id="summary-total-expense">0,00 €</strong></article>
+          <article class="summary-kpi"><span>Spese per ospite-giorno</span><strong id="summary-total-per-guest">0,00 €</strong></article>
+          <article class="summary-kpi"><span>Guadagno netto per ospite-giorno</span><strong id="summary-profit-per-guest">0,00 €</strong></article>
+          <article class="summary-kpi"><span>Tassa da versare</span><strong id="summary-tourist-tax-due">0,00 €</strong></article>
+        </div>
+        <section class="panel table-wrap" style="margin-top:16px">
+          <div class="panel-header"><h2>Riepilogo mensile completo</h2></div>
+          <table>
+            <thead><tr><th>Mese</th><th>Entrate</th><th>Entrate nette</th><th>Uscite</th><th>Utile netto</th><th>Ospiti-notte</th><th>Utenze/ospite</th><th>Spese/ospite</th><th>Guadagno/ospite</th></tr></thead>
+            <tbody id="monthly-summary-table"></tbody>
+          </table>
+        </section>
       </section>
 
       <section class="view" id="view-settings" hidden>
@@ -507,6 +526,11 @@
             <h2>Esporta movimenti</h2>
             <p>Scarica entrate e uscite in formato CSV, apribile con Excel o Google Fogli.</p>
             <div class="settings-actions"><button class="button secondary" id="export-csv">Scarica CSV</button></div>
+          </section>
+          <section class="panel">
+            <h2>Impostazioni calcoli</h2>
+            <p>Modifica la quota luce attribuita alla casa vacanze. Serve per le prossime stime e per ricordare il criterio usato.</p>
+            <div class="setting-row"><div class="form-field"><label for="electricity-share">Quota luce casa vacanze (%)</label><input id="electricity-share" type="number" min="0" max="100" step="1" inputmode="decimal"></div><button class="button secondary" id="save-settings" type="button">Salva</button></div>
           </section>
           <section class="panel">
             <h2>Cancella tutti i dati</h2>
@@ -561,11 +585,11 @@
       <div class="dialog-body">
         <div class="form-grid">
           <div class="form-field"><label for="utility-type">Utenza</label><select id="utility-type" required><option value="water">Acqua (m³)</option><option value="electricity">Luce (kWh)</option><option value="gas">Gas (Smc)</option></select></div>
-          <div class="form-field"><label for="utility-date">Data fine periodo</label><input id="utility-date" type="date" required></div>
+          <div class="form-field"><label for="utility-period-start">Data inizio periodo</label><input id="utility-period-start" type="date"></div><div class="form-field"><label for="utility-date">Data fine periodo</label><input id="utility-date" type="date" required></div>
           <div class="form-field"><label for="utility-consumption">Consumo nel periodo</label><input id="utility-consumption" type="number" min="0.001" step="0.001" inputmode="decimal" required></div>
           <div class="form-field"><label for="utility-cost">Costo (€) facoltativo</label><input id="utility-cost" type="number" min="0" step="0.01" inputmode="decimal"></div>
-          <div class="form-field"><label for="utility-people">Numero ospiti</label><input id="utility-people" type="number" min="1" step="1" inputmode="numeric" required></div>
-          <div class="form-field"><label for="utility-days">Giorni di permanenza</label><input id="utility-days" type="number" min="1" step="1" inputmode="numeric" required></div>
+          <div class="form-field"><label for="utility-people">Ospiti-notte</label><input id="utility-people" type="number" min="0" step="1" inputmode="numeric" placeholder="Automatico"></div>
+          <div class="form-field"><label for="utility-days">Divisore giorni</label><input id="utility-days" type="number" min="1" step="1" inputmode="numeric" value="1" placeholder="1"></div>
           <div class="form-field full"><label for="utility-notes">Note (facoltative)</label><input id="utility-notes" maxlength="100" placeholder="Es. Prenotazione Rossi"></div>
         </div>
         <div class="dialog-actions"><button type="button" class="button secondary" data-close-dialog>Annulla</button><button type="submit" class="button">Salva consumo</button></div>
@@ -615,8 +639,8 @@
 
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
-      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260625-v12';
-      const DATA_VERSION = 13;
+      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260625-v15';
+      const DATA_VERSION = 15;
       const incomeTransactions = [
         ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '2026-01-03', '2026-01-04', 'posted', 'Guadagni Airbnb - gennaio 2026', 3],
         ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '2026-03-19', '2026-03-21', 'posted', 'Guadagni Airbnb - marzo 2026', 3],
@@ -825,6 +849,7 @@
         const migrated = {
           transactions: Array.isArray(rawState?.transactions) ? [...rawState.transactions] : [],
           utilities: Array.isArray(rawState?.utilities) ? [...rawState.utilities] : [],
+          settings: { electricityShare: 25, ...(rawState?.settings || {}) },
           dataVersion: sourceVersion
         };
         if (sourceVersion >= DATA_VERSION) return migrated;
@@ -1096,10 +1121,103 @@
         setTimeout(() => $('#transaction-amount').focus(), 50);
       }
 
+      function daysBetween(start, end) {
+        if (!start || !end || end <= start) return 0;
+        return Math.round((new Date(end + 'T12:00:00') - new Date(start + 'T12:00:00')) / 86400000);
+      }
+
+      function monthRange(month) {
+        const start = `${month}-01`;
+        const endDate = new Date(start + 'T12:00:00');
+        endDate.setMonth(endDate.getMonth() + 1);
+        return { start, end: endDate.toISOString().slice(0, 10) };
+      }
+
+      function monthLabel(month) {
+        return new Intl.DateTimeFormat('it-IT', { month: 'long', year: 'numeric' }).format(new Date(`${month}-01T12:00:00`));
+      }
+
+      function overlapDays(startA, endA, startB, endB) {
+        if (!startA || !endA) return 0;
+        const start = startA > startB ? startA : startB;
+        const end = endA < endB ? endA : endB;
+        return daysBetween(start, end);
+      }
+
+      function guestNightsForPeriod(start, end) {
+        return state.transactions.filter(t => t.type === 'income' && Number(t.guests) > 0 && t.checkin && t.checkout)
+          .reduce((sum, t) => sum + Number(t.guests) * overlapDays(t.checkin, t.checkout, start, end), 0);
+      }
+
+      function utilityPersonDays(item) {
+        const explicit = Number(item.people) * (Number(item.days) || 1);
+        if (explicit > 0) return explicit;
+        if (item.periodStart && item.periodEnd) return guestNightsForPeriod(item.periodStart, item.periodEnd);
+        const range = monthRange((item.date || today).slice(0, 7));
+        return guestNightsForPeriod(range.start, range.end);
+      }
+
+      function postedInMonth(month) {
+        return state.transactions.filter(t => t.date?.startsWith(month) && isPosted(t));
+      }
+
+      function getMonths() {
+        const months = new Set(['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06']);
+        state.transactions.forEach(t => { if (t.date >= ACCOUNTING_START) months.add(t.date.slice(0, 7)); });
+        state.utilities.forEach(u => { if (u.date >= ACCOUNTING_START) months.add(u.date.slice(0, 7)); });
+        return [...months].sort();
+      }
+
+      function monthlySummary(month) {
+        const { start, end } = monthRange(month);
+        const items = postedInMonth(month);
+        const income = items.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+        const touristTaxIncome = items.filter(t => t.type === 'income' && t.category === 'Tassa di soggiorno').reduce((sum, t) => sum + Number(t.amount), 0);
+        const touristTaxPaid = items.filter(t => t.type === 'expense' && t.category === 'Tassa di soggiorno').reduce((sum, t) => sum + Number(t.amount), 0);
+        const operatingExpenses = items.filter(t => t.type === 'expense' && t.category !== 'Tassa di soggiorno').reduce((sum, t) => sum + Number(t.amount), 0);
+        const utilityCosts = state.utilities.reduce((sum, u) => {
+          if (u.periodStart && u.periodEnd) {
+            const totalDays = daysBetween(u.periodStart, u.periodEnd) || 1;
+            const days = overlapDays(u.periodStart, u.periodEnd, start, end);
+            return sum + Number(u.cost || 0) * days / totalDays;
+          }
+          return sum + (u.date?.startsWith(month) ? Number(u.cost || 0) : 0);
+        }, 0);
+        const guestNights = guestNightsForPeriod(start, end);
+        const netIncome = income - touristTaxIncome;
+        const netProfit = netIncome - operatingExpenses;
+        return { month, income, touristTaxIncome, touristTaxPaid, netIncome, operatingExpenses, utilityCosts, guestNights, netProfit };
+      }
+
+      function renderMonthlySummary() {
+        const summaries = getMonths().map(monthlySummary).filter(row => row.income || row.operatingExpenses || row.utilityCosts || row.guestNights || row.touristTaxIncome || row.touristTaxPaid);
+        const totals = summaries.reduce((acc, row) => {
+          Object.keys(acc).forEach(key => acc[key] += row[key] || 0);
+          return acc;
+        }, { income: 0, touristTaxIncome: 0, touristTaxPaid: 0, netIncome: 0, operatingExpenses: 0, utilityCosts: 0, guestNights: 0, netProfit: 0 });
+        $('#summary-total-expense').textContent = euro.format(totals.operatingExpenses);
+        $('#summary-total-per-guest').textContent = totals.guestNights ? euro.format(totals.operatingExpenses / totals.guestNights) : '0,00 €';
+        $('#summary-profit-per-guest').textContent = totals.guestNights ? euro.format(totals.netProfit / totals.guestNights) : '0,00 €';
+        $('#summary-tourist-tax-due').textContent = euro.format(totals.touristTaxIncome - totals.touristTaxPaid);
+        $('#monthly-summary-table').innerHTML = summaries.map(row => `
+          <tr>
+            <td><strong>${monthLabel(row.month)}</strong></td>
+            <td>${euro.format(row.income)}</td>
+            <td>${euro.format(row.netIncome)}<br><small>senza tassa soggiorno</small></td>
+            <td>${euro.format(row.operatingExpenses)}</td>
+            <td class="amount ${row.netProfit >= 0 ? 'income' : 'expense'}">${euro.format(row.netProfit)}</td>
+            <td>${number.format(row.guestNights)}</td>
+            <td>${row.guestNights ? euro.format(row.utilityCosts / row.guestNights) : '—'}</td>
+            <td>${row.guestNights ? euro.format(row.operatingExpenses / row.guestNights) : '—'}</td>
+            <td>${row.guestNights ? euro.format(row.netProfit / row.guestNights) : '—'}</td>
+          </tr>`).join('') || '<tr><td colspan="9">Nessun dato mensile disponibile.</td></tr>';
+      }
+
       function renderAll() {
         renderHome();
         renderMovements();
         renderUtilities();
+        renderSettings();
       }
 
       function renderHome() {
@@ -1169,29 +1287,36 @@
       }
 
       function renderUtilities() {
-        const allCostedItems = state.utilities.filter(item => Number(item.people) > 0 && Number(item.days) > 0 && Number(item.cost) > 0);
+        const allCostedItems = state.utilities.filter(item => utilityPersonDays(item) > 0 && Number(item.cost) > 0);
         const totalUtilityCost = allCostedItems.reduce((sum, item) => sum + Number(item.cost), 0);
-        const totalUtilityPersonDays = allCostedItems.reduce((sum, item) => sum + Number(item.people) * Number(item.days), 0);
+        const totalUtilityPersonDays = allCostedItems.reduce((sum, item) => sum + utilityPersonDays(item), 0);
         $('#average-utility-cost').textContent = totalUtilityPersonDays ? euro.format(totalUtilityCost / totalUtilityPersonDays) : '0,00 €';
 
         Object.keys(utilityInfo).forEach(type => {
-          const items = state.utilities.filter(item => item.type === type && Number(item.people) > 0 && Number(item.days) > 0);
+          const items = state.utilities.filter(item => item.type === type && utilityPersonDays(item) > 0);
           const totalConsumption = items.reduce((sum, item) => sum + Number(item.consumption), 0);
-          const personDays = items.reduce((sum, item) => sum + Number(item.people) * Number(item.days), 0);
+          const personDays = items.reduce((sum, item) => sum + utilityPersonDays(item), 0);
           $(`#average-${type}`).textContent = personDays ? number.format(totalConsumption / personDays) : '0';
         });
 
         const sorted = [...state.utilities].sort((a,b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
         $('#utilities-table').innerHTML = sorted.map(item => {
           const info = utilityInfo[item.type];
-          const hasOccupancy = Number(item.people) > 0 && Number(item.days) > 0;
-          const average = hasOccupancy ? Number(item.consumption) / (Number(item.people) * Number(item.days)) : null;
+          const personDays = utilityPersonDays(item);
+          const explicitPersonDays = Number(item.people) * (Number(item.days) || 1);
+          const average = personDays > 0 ? Number(item.consumption) / personDays : null;
           const period = item.periodStart && item.periodEnd ? `<br><small>${formatDate(item.periodStart)} - ${formatDate(item.periodEnd)}</small>` : '';
-          const costAverage = hasOccupancy && item.cost ? Number(item.cost) / (Number(item.people) * Number(item.days)) : null;
-          const costCell = item.cost ? `${euro.format(item.cost)}${costAverage === null ? '' : `<br><small>${euro.format(costAverage)} per ospite-notte</small>`}` : '—';
-          return `<tr><td>${formatDate(item.date)}${period}</td><td><strong>${info.label}</strong><br><small>${escapeHtml(item.notes || '')}</small></td><td>${number.format(item.consumption)} ${info.unit}</td><td>${item.people || '—'}</td><td>${item.days || '—'}</td><td>${average === null ? '<strong>Da completare</strong>' : `<strong>${number.format(average)}</strong> ${info.unit}/ospite-notte`}</td><td>${costCell}</td><td><button class="delete-icon" data-delete-utility="${item.id}" aria-label="Elimina consumo" title="Elimina">×</button></td></tr>`;
+          const costAverage = personDays > 0 && item.cost ? Number(item.cost) / personDays : null;
+          const occupancyLabel = personDays ? `${number.format(personDays)}${explicitPersonDays ? '' : '<br><small>auto</small>'}` : '—';
+          const costCell = item.cost ? `${euro.format(item.cost)}${costAverage === null ? '' : `<br><small>${euro.format(costAverage)} per ospite-giorno</small>`}` : '—';
+          return `<tr><td>${formatDate(item.date)}${period}</td><td><strong>${info.label}</strong><br><small>${escapeHtml(item.notes || '')}</small></td><td>${number.format(item.consumption)} ${info.unit}</td><td>${occupancyLabel}</td><td>${item.days || 1}</td><td>${average === null ? '<strong>Da completare</strong>' : `<strong>${number.format(average)}</strong> ${info.unit}/ospite-giorno`}</td><td>${costCell}</td><td><button class="delete-icon" data-delete-utility="${item.id}" aria-label="Elimina consumo" title="Elimina">×</button></td></tr>`;
         }).join('');
         $('#utilities-empty').hidden = sorted.length > 0;
+        renderMonthlySummary();
+      }
+
+      function renderSettings() {
+        if ($('#electricity-share')) $('#electricity-share').value = Number(state.settings?.electricityShare ?? 25);
       }
 
       function download(filename, content, type) {
@@ -1258,6 +1383,8 @@
       $('#add-utility').addEventListener('click', () => {
         $('#utility-form').reset();
         $('#utility-date').value = today;
+        $('#utility-period-start').value = today.slice(0, 8) + '01';
+        $('#utility-days').value = 1;
         $('#utility-dialog').showModal();
       });
 
@@ -1267,10 +1394,12 @@
           id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
           type: $('#utility-type').value,
           date: $('#utility-date').value,
+          periodStart: $('#utility-period-start').value || '',
+          periodEnd: $('#utility-date').value,
           consumption: Number($('#utility-consumption').value),
           cost: Number($('#utility-cost').value) || 0,
-          people: Number($('#utility-people').value),
-          days: Number($('#utility-days').value),
+          people: Number($('#utility-people').value) || null,
+          days: Number($('#utility-days').value) || 1,
           notes: $('#utility-notes').value.trim(),
           createdAt: Date.now()
         });
@@ -1311,6 +1440,7 @@
             state = {
               transactions: [...state.transactions, ...newTransactions],
               utilities: [...state.utilities, ...newUtilities],
+              settings: { ...(state.settings || {}), ...(imported.settings || {}) },
               dataVersion: DATA_VERSION
             };
             saveState(`${newTransactions.length + newUtilities.length} nuove voci importate`);
@@ -1325,9 +1455,14 @@
         download(`movimenti-casa-vacanze-${today}.csv`, '\ufeff' + rows.map(row => row.map(quote).join(';')).join('\n'), 'text/csv;charset=utf-8');
       });
 
+      $('#save-settings').addEventListener('click', () => {
+        state.settings = { ...(state.settings || {}), electricityShare: Number($('#electricity-share').value) || 25 };
+        saveState('Impostazioni salvate');
+      });
+
       $('#clear-data').addEventListener('click', () => {
         if (confirm('Confermi di voler cancellare tutti i dati? Questa operazione non si può annullare.')) {
-          state = { transactions: [], utilities: [], dataVersion: DATA_VERSION };
+          state = { transactions: [], utilities: [], settings: { electricityShare: 25 }, dataVersion: DATA_VERSION };
           saveState('Tutti i dati sono stati cancellati');
         }
       });
