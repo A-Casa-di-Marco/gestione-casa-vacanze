@@ -265,7 +265,7 @@
     .tag.income { color: var(--income); background: var(--income-soft); }
     .tag.expense { color: var(--expense); background: var(--expense-soft); }
 
-    .utility-summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 16px; }
+    .utility-summary { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 16px; }
     .utility-card { padding: 18px; background: #fff; border: 1px solid var(--line); border-top: 4px solid; border-radius: var(--radius); }
     .utility-card.water { border-top-color: var(--water); }
     .utility-card.electricity { border-top-color: var(--electricity); }
@@ -483,8 +483,9 @@
           <article class="utility-card water"><span>Acqua</span><strong id="average-water">0</strong><small>m³ per persona al giorno</small></article>
           <article class="utility-card electricity"><span>Luce</span><strong id="average-electricity">0</strong><small>kWh per persona al giorno</small></article>
           <article class="utility-card gas"><span>Gas</span><strong id="average-gas">0</strong><small>Smc per persona al giorno</small></article>
+          <article class="utility-card"><span>Costo stimato</span><strong id="average-utility-cost">0,00 €</strong><small>utenze per ospite al giorno</small></article>
         </div>
-        <div class="notice" style="margin-bottom:14px">La media viene calcolata dividendo il consumo per il numero di ospiti e per i giorni di permanenza.</div>
+        <div class="notice" style="margin-bottom:14px">La media viene calcolata dividendo consumi e costi per gli ospiti-notte. Ogni nuova bolletta con costo, ospiti e giorni aggiorna automaticamente la stima.</div>
         <section class="panel table-wrap">
           <table>
             <thead><tr><th>Data</th><th>Utenza</th><th>Consumo</th><th>Ospiti</th><th>Giorni</th><th>Media</th><th>Costo</th><th></th></tr></thead>
@@ -614,8 +615,8 @@
 
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
-      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260620-v9';
-      const DATA_VERSION = 11;
+      const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260625-v12';
+      const DATA_VERSION = 13;
       const incomeTransactions = [
         ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '2026-01-03', '2026-01-04', 'posted', 'Guadagni Airbnb - gennaio 2026', 3],
         ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '2026-03-19', '2026-03-21', 'posted', 'Guadagni Airbnb - marzo 2026', 3],
@@ -1168,6 +1169,11 @@
       }
 
       function renderUtilities() {
+        const allCostedItems = state.utilities.filter(item => Number(item.people) > 0 && Number(item.days) > 0 && Number(item.cost) > 0);
+        const totalUtilityCost = allCostedItems.reduce((sum, item) => sum + Number(item.cost), 0);
+        const totalUtilityPersonDays = allCostedItems.reduce((sum, item) => sum + Number(item.people) * Number(item.days), 0);
+        $('#average-utility-cost').textContent = totalUtilityPersonDays ? euro.format(totalUtilityCost / totalUtilityPersonDays) : '0,00 €';
+
         Object.keys(utilityInfo).forEach(type => {
           const items = state.utilities.filter(item => item.type === type && Number(item.people) > 0 && Number(item.days) > 0);
           const totalConsumption = items.reduce((sum, item) => sum + Number(item.consumption), 0);
