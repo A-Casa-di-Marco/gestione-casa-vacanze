@@ -397,6 +397,36 @@
       .balance-actions .button { flex: 1; }
       .panel { padding: 15px; }
       table { min-width: 680px; }
+
+      /* Movimenti: tabella come card su telefono */
+      #view-movements .table-wrap { overflow-x: visible; }
+      #view-movements table { min-width: 0; }
+      #view-movements thead { display: none; }
+      #view-movements tbody,
+      #view-movements tr,
+      #view-movements td { display: block; }
+      #view-movements tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        margin-bottom: 12px;
+        padding: 14px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: 0 4px 16px rgba(28,54,45,0.04);
+      }
+      #view-movements tbody tr:last-child { margin-bottom: 0; }
+      #view-movements td { padding: 0; border: 0; }
+      #view-movements td.m-amount { order: 1; flex: 0 0 auto; font-size: 17px; }
+      #view-movements td.m-date { order: 2; flex: 1 1 auto; text-align: right; color: var(--muted); font-size: 13px; }
+      #view-movements td.m-type { order: 3; flex: 0 0 auto; }
+      #view-movements td.m-desc { order: 4; width: 100%; }
+      #view-movements td.m-desc strong { font-size: 15px; }
+      #view-movements td.m-desc small { display: block; color: var(--muted); font-size: 12px; margin-top: 4px; }
+      #view-movements td.m-cat { order: 5; width: 100%; color: var(--muted); font-size: 13px; }
+      #view-movements td.m-actions { order: 6; width: 100%; text-align: right; padding-top: 10px; border-top: 1px solid #edf1ef; }
+      #view-movements td.m-actions .row-actions { justify-content: flex-end; }
     }
   </style>
 </head>
@@ -470,6 +500,11 @@
           <select id="movement-type" aria-label="Filtra per tipo"><option value="all">Entrate e uscite</option><option value="income">Solo entrate</option><option value="expense">Solo uscite</option></select>
           <select id="movement-category" aria-label="Filtra per categoria"><option value="all">Tutte le categorie</option></select>
           <input type="month" id="movement-month" aria-label="Filtra per mese">
+        </div>
+        <div class="stats-grid" id="movements-summary">
+          <article class="stat-card income"><span class="label">Entrate filtrate</span><strong id="movements-income">0,00 €</strong></article>
+          <article class="stat-card expense"><span class="label">Uscite filtrate</span><strong id="movements-expense">0,00 €</strong></article>
+          <article class="stat-card"><span class="label">Saldo filtrato</span><strong id="movements-balance">0,00 €</strong></article>
         </div>
         <section class="panel table-wrap">
           <table>
@@ -1276,14 +1311,26 @@
           return (!query || searchable.includes(query)) && (type === 'all' || t.type === type) && (category === 'all' || t.category === category) && (!month || t.date.startsWith(month));
         }).sort((a,b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 
+        const incomeTotal = filtered.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
+        const expenseTotal = filtered.filter(t => t.type === 'expense').reduce((sum, t) => sum + Number(t.amount), 0);
+        const balance = incomeTotal - expenseTotal;
+        $('#movements-income').textContent = euro.format(incomeTotal);
+        $('#movements-expense').textContent = euro.format(expenseTotal);
+        const balanceEl = $('#movements-balance');
+        balanceEl.textContent = euro.format(balance);
+        balanceEl.style.color = balance > 0 ? 'var(--income)' : balance < 0 ? 'var(--expense)' : 'var(--text)';
+
         $('#movements-table').innerHTML = filtered.map(t => `
           <tr>
-            <td>${formatDate(t.date)}</td><td><span class="tag ${t.type}">${!isPosted(t) ? 'In programma' : (t.type === 'income' ? 'Entrata' : 'Uscita')}</span></td>
-            <td><strong>${escapeHtml(t.description)}</strong>${t.method ? `<br><small>${escapeHtml(t.method)}</small>` : ''}${staySummary(t) ? `<br><small>${staySummary(t)}</small>` : ''}</td>
-            <td>${escapeHtml(t.category)}</td><td class="amount ${t.type}">${t.type === 'income' ? '+' : '−'} ${euro.format(t.amount)}</td>
-            <td><div class="row-actions"><button class="edit-button" data-edit-transaction="${t.id}">Modifica</button><button class="delete-icon" data-delete-transaction="${t.id}" aria-label="Elimina movimento" title="Elimina">×</button></div></td>
+            <td class="m-date">${formatDate(t.date)}</td>
+            <td class="m-type"><span class="tag ${t.type}">${!isPosted(t) ? 'In programma' : (t.type === 'income' ? 'Entrata' : 'Uscita')}</span></td>
+            <td class="m-desc"><strong>${escapeHtml(t.description)}</strong>${t.method ? `<br><small>${escapeHtml(t.method)}</small>` : ''}${staySummary(t) ? `<br><small>${staySummary(t)}</small>` : ''}</td>
+            <td class="m-cat">${escapeHtml(t.category)}</td>
+            <td class="m-amount ${t.type}">${(t.type === 'income' ? '+' : '-')} ${euro.format(t.amount).replace(/\u00A0/g, ' ')}</td>
+            <td class="m-actions"><div class="row-actions"><button class="edit-button" data-edit-transaction="${t.id}">Modifica</button><button class="delete-icon" data-delete-transaction="${t.id}" aria-label="Elimina movimento" title="Elimina">×</button></div></td>
           </tr>`).join('');
         $('#movements-empty').hidden = filtered.length > 0;
+        $('#movements-summary').hidden = filtered.length === 0;
       }
 
       function renderUtilities() {
