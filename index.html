@@ -282,6 +282,7 @@
     .summary-kpi { padding: 16px; background: #fff; border: 1px solid var(--line); border-radius: var(--radius); }
     .summary-kpi span { display:block; color: var(--muted); font-size: 12px; font-weight: 800; }
     .summary-kpi strong { display:block; margin-top: 6px; font-size: 21px; }
+    .summary-kpi small { display: block; margin-top: 6px; color: var(--muted); font-size: 12px; line-height: 1.4; }
     .setting-row { display:grid; grid-template-columns: 1fr auto; gap: 12px; align-items:end; }
 
     .empty-state { padding: 38px 18px; color: var(--muted); text-align: center; }
@@ -427,6 +428,83 @@
       #view-movements td.m-cat { order: 5; width: 100%; color: var(--muted); font-size: 13px; }
       #view-movements td.m-actions { order: 6; width: 100%; text-align: right; padding-top: 10px; border-top: 1px solid #edf1ef; }
       #view-movements td.m-actions .row-actions { justify-content: flex-end; }
+
+      /* Consumi: tabella come card su telefono */
+      #view-utilities .table-wrap { overflow-x: visible; }
+      #view-utilities table { min-width: 0; }
+      #view-utilities thead { display: none; }
+      #view-utilities tbody,
+      #view-utilities tr,
+      #view-utilities td { display: block; }
+      #view-utilities tbody tr {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        margin-bottom: 12px;
+        padding: 14px;
+        background: var(--surface);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        box-shadow: 0 4px 16px rgba(28,54,45,0.04);
+      }
+      #view-utilities tbody tr:last-child { margin-bottom: 0; }
+      #view-utilities td { padding: 0; border: 0; }
+      #view-utilities td.u-type { order: 1; flex: 1 1 auto; }
+      #view-utilities td.u-type strong { font-size: 15px; }
+      #view-utilities td.u-type small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+      #view-utilities td.u-date { order: 2; flex: 0 0 auto; text-align: right; color: var(--muted); font-size: 12px; }
+      #view-utilities td.u-date small { display: block; color: var(--muted); font-size: 11px; }
+      #view-utilities td.u-consumption { order: 3; flex: 0 0 auto; font-size: 17px; font-weight: 850; }
+      #view-utilities td.u-average { order: 4; flex: 1 1 auto; font-size: 13px; color: var(--muted); }
+      #view-utilities td.u-average strong { color: var(--text); }
+      #view-utilities td.u-people { order: 5; flex: 0 0 auto; color: var(--muted); font-size: 13px; }
+      #view-utilities td.u-days { order: 6; flex: 1 1 auto; color: var(--muted); font-size: 13px; }
+      #view-utilities td.u-cost { order: 7; width: 100%; font-size: 15px; font-weight: 850; }
+      #view-utilities td.u-cost small { display: block; color: var(--muted); font-size: 12px; font-weight: 400; }
+      #view-utilities td.u-average,
+      #view-utilities td.u-people,
+      #view-utilities td.u-days,
+      #view-utilities td.u-cost,
+      #view-utilities td.u-consumption { position: relative; }
+      #view-utilities td.u-average::before,
+      #view-utilities td.u-people::before,
+      #view-utilities td.u-days::before,
+      #view-utilities td.u-cost::before,
+      #view-utilities td.u-consumption::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+      }
+      #view-utilities td.u-actions { order: 8; width: 100%; text-align: right; padding-top: 8px; border-top: 1px solid #edf1ef; }
+
+      /* Riepilogo mensile: card con etichette su telefono */
+      #monthly-summary-table tbody tr {
+        flex-wrap: wrap;
+        gap: 10px 12px;
+      }
+      #monthly-summary-table td {
+        flex: 1 1 calc(50% - 12px);
+        font-size: 13px;
+      }
+      #monthly-summary-table td.ms-month { flex: 1 1 100%; font-size: 16px; }
+      #monthly-summary-table td.ms-month::before { display: none; }
+      #monthly-summary-table td::before {
+        content: attr(data-label);
+        display: block;
+        margin-bottom: 2px;
+        color: var(--muted);
+        font-size: 10px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+      }
+      #monthly-summary-table td small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+      #monthly-summary-table td.amount { white-space: normal; }
     }
   </style>
 </head>
@@ -535,10 +613,10 @@
           <div class="empty-state" id="utilities-empty"><strong>Nessun consumo registrato</strong>Inserisci acqua, luce o gas per calcolare le medie.</div>
         </section>
         <div class="summary-kpis">
-          <article class="summary-kpi"><span>Spese totali</span><strong id="summary-total-expense">0,00 €</strong></article>
-          <article class="summary-kpi"><span>Spese per ospite-giorno</span><strong id="summary-total-per-guest">0,00 €</strong></article>
-          <article class="summary-kpi"><span>Guadagno netto per ospite-giorno</span><strong id="summary-profit-per-guest">0,00 €</strong></article>
-          <article class="summary-kpi"><span>Tassa da versare</span><strong id="summary-tourist-tax-due">0,00 €</strong></article>
+          <article class="summary-kpi"><span>Spese totali</span><strong id="summary-total-expense">0,00 €</strong><small>Somma delle spese operative registrate (utenze, pulizie, forniture…).</small></article>
+          <article class="summary-kpi"><span>Spese per ospite-giorno</span><strong id="summary-total-per-guest">0,00 €</strong><small>Spese totali divise per gli ospiti-notte del periodo.</small></article>
+          <article class="summary-kpi"><span>Guadagno netto per ospite-giorno</span><strong id="summary-profit-per-guest">0,00 €</strong><small>Entrate nette meno spese, divise per gli ospiti-notte.</small></article>
+          <article class="summary-kpi"><span>Tassa da versare</span><strong id="summary-tourist-tax-due">0,00 €</strong><small>Tassa di soggiorno incassata meno quanto già versato.</small></article>
         </div>
         <section class="panel table-wrap" style="margin-top:16px">
           <div class="panel-header"><h2>Riepilogo mensile completo</h2></div>
@@ -1236,15 +1314,15 @@
         $('#summary-tourist-tax-due').textContent = euro.format(totals.touristTaxIncome - totals.touristTaxPaid);
         $('#monthly-summary-table').innerHTML = summaries.map(row => `
           <tr>
-            <td><strong>${monthLabel(row.month)}</strong></td>
-            <td>${euro.format(row.income)}</td>
-            <td>${euro.format(row.netIncome)}<br><small>senza tassa soggiorno</small></td>
-            <td>${euro.format(row.operatingExpenses)}</td>
-            <td class="amount ${row.netProfit >= 0 ? 'income' : 'expense'}">${euro.format(row.netProfit)}</td>
-            <td>${number.format(row.guestNights)}</td>
-            <td>${row.guestNights ? euro.format(row.utilityCosts / row.guestNights) : '—'}</td>
-            <td>${row.guestNights ? euro.format(row.operatingExpenses / row.guestNights) : '—'}</td>
-            <td>${row.guestNights ? euro.format(row.netProfit / row.guestNights) : '—'}</td>
+            <td class="ms-month"><strong>${monthLabel(row.month)}</strong></td>
+            <td class="ms-income" data-label="Entrate">${euro.format(row.income)}</td>
+            <td class="ms-netincome" data-label="Entrate nette">${euro.format(row.netIncome)}<br><small>senza tassa soggiorno</small></td>
+            <td class="ms-expense" data-label="Uscite">${euro.format(row.operatingExpenses)}</td>
+            <td class="ms-profit amount ${row.netProfit >= 0 ? 'income' : 'expense'}" data-label="Utile netto">${euro.format(row.netProfit)}</td>
+            <td class="ms-guests" data-label="Ospiti-notte">${number.format(row.guestNights)}</td>
+            <td class="ms-utility-per" data-label="Utenze/ospite">${row.guestNights ? euro.format(row.utilityCosts / row.guestNights) : '—'}</td>
+            <td class="ms-cost-per" data-label="Spese/ospite">${row.guestNights ? euro.format(row.operatingExpenses / row.guestNights) : '—'}</td>
+            <td class="ms-profit-per" data-label="Guadagno/ospite">${row.guestNights ? euro.format(row.netProfit / row.guestNights) : '—'}</td>
           </tr>`).join('') || '<tr><td colspan="9">Nessun dato mensile disponibile.</td></tr>';
       }
 
@@ -1356,7 +1434,16 @@
           const costAverage = personDays > 0 && item.cost ? Number(item.cost) / personDays : null;
           const occupancyLabel = personDays ? `${number.format(personDays)}${explicitPersonDays ? '' : '<br><small>auto</small>'}` : '—';
           const costCell = item.cost ? `${euro.format(item.cost)}${costAverage === null ? '' : `<br><small>${euro.format(costAverage)} per ospite-giorno</small>`}` : '—';
-          return `<tr><td>${formatDate(item.date)}${period}</td><td><strong>${info.label}</strong><br><small>${escapeHtml(item.notes || '')}</small></td><td>${number.format(item.consumption)} ${info.unit}</td><td>${occupancyLabel}</td><td>${item.days || 1}</td><td>${average === null ? '<strong>Da completare</strong>' : `<strong>${number.format(average)}</strong> ${info.unit}/ospite-giorno`}</td><td>${costCell}</td><td><button class="delete-icon" data-delete-utility="${item.id}" aria-label="Elimina consumo" title="Elimina">×</button></td></tr>`;
+          return `<tr>
+            <td class="u-date">${formatDate(item.date)}${period}</td>
+            <td class="u-type"><strong>${info.label}</strong><br><small>${escapeHtml(item.notes || '')}</small></td>
+            <td class="u-consumption" data-label="Consumo">${number.format(item.consumption)} ${info.unit}</td>
+            <td class="u-people" data-label="Ospiti">${occupancyLabel}</td>
+            <td class="u-days" data-label="Giorni">${item.days || 1}</td>
+            <td class="u-average" data-label="Media">${average === null ? '<strong>Da completare</strong>' : `<strong>${number.format(average)}</strong> ${info.unit}/ospite-giorno`}</td>
+            <td class="u-cost" data-label="Costo">${costCell}</td>
+            <td class="u-actions"><button class="delete-icon" data-delete-utility="${item.id}" aria-label="Elimina consumo" title="Elimina">×</button></td>
+          </tr>`;
         }).join('');
         $('#utilities-empty').hidden = sorted.length > 0;
         renderMonthlySummary();
