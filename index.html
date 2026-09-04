@@ -753,7 +753,7 @@
       const ACCOUNTING_START = '2026-01-01';
       const BILL_SEED_KEY = 'a-casa-di-marco-bills-20260620-v1';
       const DATA_MIGRATION_KEY = 'a-casa-di-marco-data-20260625-v15';
-      const DATA_VERSION = 15;
+      const DATA_VERSION = 17;
       const incomeTransactions = [
         ['report-airbnb-monthly-202601', 'Airbnb', 90.41, '2026-01-31', '2026-01-03', '2026-01-04', 'posted', 'Guadagni Airbnb - gennaio 2026', 3],
         ['report-airbnb-monthly-202603', 'Airbnb', 150.68, '2026-03-31', '2026-03-19', '2026-03-21', 'posted', 'Guadagni Airbnb - marzo 2026', 3],
@@ -818,6 +818,20 @@
           date: '2026-07-07', category: 'Utenze', method: 'Addebito automatico',
           description: 'Conguaglio acqua dicembre-maggio', notes: 'Consumo effettivo 27 m³',
           guests: null, checkin: '', checkout: '', status: 'planned', createdAt: 1783382400001
+        },
+        {
+          id: 'bill-water-2026-05-08-stima-vacation', type: 'expense', amount: 63.00,
+          date: '2026-09-03', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Acqua casa vacanze - mag/ago (stima)',
+          notes: 'Fattura 0/290741 del 03/09/2026; periodo 28/05-31/08/2026; consumo stimato 22 mc; totale 63,00 €',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: new Date('2026-09-03T12:00:00').getTime() + 1
+        },
+        {
+          id: 'bill-electricity-2026-06-07-share25', type: 'expense', amount: 134.45,
+          date: '2026-08-11', category: 'Utenze', method: 'Addebito automatico',
+          description: 'Luce quota casa vacanze 25% - giu/lug',
+          notes: 'Fattura 5461997550 del 11/08/2026; periodo 01/06-31/07/2026; totale bolletta 537,81 €; quota casa vacanze 25%; consumo 447 kWh (1.788 x 25%)',
+          guests: null, checkin: '', checkout: '', status: 'posted', createdAt: new Date('2026-08-11T12:00:00').getTime() + 2
         }
       ];
       const manualTransactions = [
@@ -954,6 +968,21 @@
           id: 'utility-2026-05-water', type: 'water', date: '2026-05-31',
           periodStart: '2026-05-01', periodEnd: '2026-05-31', consumption: 27,
           cost: 12.00, people: 53, days: 1, notes: 'Maggio: 53 ospiti-notte; conguaglio acqua imputato a maggio', createdAt: 1780185600102
+        },
+        {
+          id: 'utility-2026-05-08-water-stima', type: 'water', date: '2026-08-31',
+          periodStart: '2026-05-28', periodEnd: '2026-08-31', consumption: 22,
+          cost: 63.00, people: null, days: 1, notes: 'Acqua casa vacanze - 28/05-31/08/2026; 22 mc stimati; fattura 0/290741 del 03/09/2026', createdAt: new Date('2026-08-31T12:00:00').getTime() + 100
+        },
+        {
+          id: 'utility-2026-06-electricity-share25', type: 'electricity', date: '2026-06-30',
+          periodStart: '2026-06-01', periodEnd: '2026-06-30', consumption: 166.5,
+          cost: 50.08, people: null, days: 1, notes: 'Giugno: luce quota casa vacanze 25% (666 kWh x 25%)', createdAt: new Date('2026-06-30T12:00:00').getTime() + 101
+        },
+        {
+          id: 'utility-2026-07-electricity-share25', type: 'electricity', date: '2026-07-31',
+          periodStart: '2026-07-01', periodEnd: '2026-07-31', consumption: 280.5,
+          cost: 84.37, people: null, days: 1, notes: 'Luglio: luce quota casa vacanze 25% (1.122 kWh x 25%)', createdAt: new Date('2026-07-31T12:00:00').getTime() + 102
         }
       ];
 
