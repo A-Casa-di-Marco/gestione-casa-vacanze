@@ -36,7 +36,6 @@
 
     body {
       margin: 0;
-      min-width: 320px;
       color: var(--text);
       background: var(--bg);
       font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -62,6 +61,7 @@
       gap: 20px;
       min-height: 68px;
       padding: 12px clamp(18px, 4vw, 48px);
+      padding-top: calc(12px + env(safe-area-inset-top, 0px));
       color: #fff;
       background: #123a30;
       border-bottom: 1px solid rgba(255, 255, 255, 0.1);
@@ -291,6 +291,7 @@
     dialog {
       width: min(580px, calc(100% - 28px));
       max-height: calc(100vh - 30px);
+      max-height: calc(100dvh - 30px);
       overflow: auto;
       border: 0;
       border-radius: 8px;
@@ -323,6 +324,7 @@
     .type-switch label { padding: 11px; border: 2px solid var(--line); border-radius: 7px; text-align: center; cursor: pointer; }
     .type-switch input[value="income"]:checked + label { color: var(--income); border-color: var(--income); background: var(--income-soft); }
     .type-switch input[value="expense"]:checked + label { color: var(--expense); border-color: var(--expense); background: var(--expense-soft); }
+    .type-switch input:focus-visible + label { outline: 3px solid rgba(8, 127, 91, 0.2); outline-offset: 2px; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
     .auth-dialog { width: min(430px, calc(100% - 28px)); }
     .auth-brand { padding: 24px 22px 8px; text-align: center; }
@@ -354,7 +356,7 @@
 
     @media (max-width: 820px) {
       .desktop-nav { display: none; }
-      .topbar { min-height: 60px; padding: 10px 16px; }
+      .topbar { min-height: 60px; padding: 10px 16px; padding-top: calc(10px + env(safe-area-inset-top, 0px)); }
       .brand span { display: none; }
       .account-email { display: none; }
       .sync-status { max-width: 78px; overflow: hidden; text-overflow: ellipsis; }
@@ -364,8 +366,7 @@
       .heading-actions > * { flex: 1; }
       .balance-panel { grid-template-columns: 1fr; }
       .balance-actions { justify-content: flex-start; }
-      .stats-grid, .utility-summary, .summary-kpis { grid-template-columns: 1fr; }
-      .dashboard-grid, .settings-grid { grid-template-columns: 1fr; }
+      .utility-summary, .summary-kpis { grid-template-columns: repeat(2, 1fr); }
       .filter-bar { grid-template-columns: 1fr 1fr; }
       .filter-bar input[type="search"] { grid-column: 1 / -1; }
       .bottom-nav {
@@ -384,9 +385,12 @@
       .bottom-nav .nav-button::before { content: attr(data-icon); font-size: 17px; }
       .bottom-nav .nav-button.active { color: var(--brand); background: var(--brand-soft); }
       .toast { bottom: 84px; }
+      .text-button, .edit-button, .account-button { min-height: 44px; }
+      .delete-icon, .dialog-close { width: 44px; height: 44px; }
     }
 
     @media (max-width: 560px) {
+      .stats-grid, .utility-summary, .summary-kpis, .dashboard-grid, .settings-grid { grid-template-columns: 1fr; }
       .form-grid { grid-template-columns: 1fr; }
       .form-field.full { grid-column: auto; }
       .stay-fields { grid-template-columns: 1fr; grid-column: auto; }
@@ -1246,7 +1250,12 @@
 
       function setView(viewName) {
         $$('.view').forEach(view => view.hidden = view.id !== `view-${viewName}`);
-        $$('[data-view]').forEach(button => button.classList.toggle('active', button.dataset.view === viewName));
+        $$('[data-view]').forEach(button => {
+          const active = button.dataset.view === viewName;
+          button.classList.toggle('active', active);
+          if (active) button.setAttribute('aria-current', 'page');
+          else button.removeAttribute('aria-current');
+        });
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
 
