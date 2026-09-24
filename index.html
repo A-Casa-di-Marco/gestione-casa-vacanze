@@ -724,7 +724,24 @@
           <button class="button secondary" id="signup-button" type="button">Crea account</button>
           <button class="button" type="submit">Accedi</button>
         </div>
+        <button type="button" class="text-button" id="forgot-password-button" style="margin-top:14px; width:100%;">Password dimenticata?</button>
         <p class="auth-message" id="auth-message" aria-live="polite"></p>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog class="auth-dialog" id="reset-password-dialog">
+    <form id="reset-password-form">
+      <div class="auth-brand">
+        <div class="brand-mark">A</div>
+        <h2>Imposta nuova password</h2>
+        <p>Inserisci la nuova password per accedere.</p>
+      </div>
+      <div class="dialog-body">
+        <div class="form-field"><label for="reset-password">Nuova password</label><input id="reset-password" type="password" minlength="8" autocomplete="new-password" required></div>
+        <div class="form-field" style="margin-top:12px"><label for="reset-password-confirm">Conferma password</label><input id="reset-password-confirm" type="password" minlength="8" autocomplete="new-password" required></div>
+        <div class="auth-actions"><button type="submit" class="button">Aggiorna password</button></div>
+        <p class="auth-message" id="reset-password-message" aria-live="polite"></p>
       </div>
     </form>
   </dialog>
@@ -1217,7 +1234,13 @@
           showAuth();
         }
         supabaseClient.auth.onAuthStateChange((event, session) => {
-          if (event === 'SIGNED_OUT' || !session?.user) showAuth();
+          if (event === 'PASSWORD_RECOVERY') {
+            currentUser = session?.user || null;
+            $('#auth-message').textContent = '';
+            if (!$('#reset-password-dialog').open) $('#reset-password-dialog').showModal();
+          } else if (event === 'SIGNED_OUT' || !session?.user) {
+            showAuth();
+          }
         });
       }
 
@@ -1630,7 +1653,7 @@
         }
       });
 
-      [$('#transaction-dialog'), $('#utility-dialog')].forEach(dialog => dialog.addEventListener('click', event => {
+      [$('#transaction-dialog'), $('#utility-dialog'), $('#reset-password-dialog')].forEach(dialog => dialog.addEventListener('click', event => {
         if (event.target === dialog) dialog.close();
       }));
 
@@ -1671,6 +1694,57 @@
           await handleAuthenticated(data.session.user);
         } else {
           $('#auth-message').textContent = 'Controlla la tua email e conferma l’account, poi torna qui per accedere.';
+        }
+      });
+
+      $('#forgot-password-button').addEventListener('click', async () => {
+        const email = $('#auth-email').value.trim();
+        if (!email) {
+          $('#auth-message').textContent = 'Inserisci l’email usata per l’account.';
+          $('#auth-message').classList.add('error');
+          return;
+        }
+        $('#auth-message').textContent = 'Invio del link in corso...';
+        $('#auth-message').classList.remove('error');
+        const redirectTo = window.location.href.split('#')[0];
+        const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo });
+        if (error) {
+          $('#auth-message').textContent = error.message;
+          $('#auth-message').classList.add('error');
+        } else {
+          $('#auth-message').textContent = 'Controlla la tua email: ti abbiamo inviato il link per il recupero.';
+        }
+      });
+
+      $('#reset-password-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const password = $('#reset-password').value;
+        const confirm = $('#reset-password-confirm').value;
+        const message = $('#reset-password-message');
+        if (password.length < 8) {
+          message.textContent = 'La password deve avere almeno 8 caratteri.';
+          message.classList.add('error');
+          return;
+        }
+        if (password !== confirm) {
+          message.textContent = 'Le due password non coincidono.';
+          message.classList.add('error');
+          return;
+        }
+        message.textContent = 'Aggiornamento in corso...';
+        message.classList.remove('error');
+        const { error } = await supabaseClient.auth.updateUser({ password });
+        if (error) {
+          message.textContent = error.message;
+          message.classList.add('error');
+        } else {
+          $('#reset-password-dialog').close();
+          $('#auth-form').reset();
+          $('#auth-message').textContent = 'Password aggiornata. Ora puoi accedere con la nuova password.';
+          $('#auth-message').classList.remove('error');
+          showToast('Password aggiornata');
+          await supabaseClient.auth.signOut();
+          showAuth('Password aggiornata. Accedi con la nuova password.');
         }
       });
 
