@@ -71,6 +71,10 @@
       if(stay.taxableGuests==null && Number(stay.guests)>0){stay.taxableGuests=Math.max(0,Number(stay.guests)-Number(stay.childrenUnder12||0));stay.taxAdultsAssumed=stay.childrenUnder12==null;}
     }
     for(const t of s.transactions) {
+      if(!t.stayId&&t.type==='expense') {
+        const dates=t.category==='Colazione'&&t.date==='2026-05-31'&&Number(t.amount)===37.5?['2026-05-26','2026-05-31']:t.category==='Pulizie'&&t.date==='2026-08-11'&&Number(t.amount)===18?['2026-08-11','2026-08-16']:null;
+        if(dates){const candidates=s.stays.filter(x=>x.checkin===dates[0]&&x.checkout===dates[1]);if(candidates.length===1)t.stayId=candidates[0].id;}
+      }
       if(isExtra(t)&&t.stayId){t.extraOriginalStayId ||= t.stayId;t.stayId=null;}
       if(t.type==='expense'&&(t.id==='bill-water-2026-06-08-vacation'||t.date==='2026-07-07'&&Number(t.amount)===12)&&!t.ownerPeriodApplied) {
         t.previousAllocations ||= structuredClone(t.allocations||[]);
@@ -190,9 +194,9 @@
   function monthly(s,month,today) {
     const [a,b]=range(month);
     const active=s.stays.filter(t=>overlap(t.checkin,t.checkout,a,b)>0);
-    let revenue=0, costs=0, direct=0, common=0, fixedCosts=0, utilities=0, extras=0;
+    let revenue=0, costs=0, direct=0, common=0, fixedCosts=0, utilities=0, extras=0, stayRevenue=0;
     // Explicit agreed revenue is separate from cash receipts. Historical records use recorded income.
-    for(const stay of active) if(stay.agreed !== null && stay.agreed !== '' && stay.agreed !== undefined) revenue+=allocateMoney(Number(stay.agreed),stay.checkin,stay.checkout,month);
+    for(const stay of active) if(stay.agreed !== null && stay.agreed !== '' && stay.agreed !== undefined) {const value=allocateMoney(Number(stay.agreed),stay.checkin,stay.checkout,month);revenue+=value;stayRevenue+=value;}
     for(const t of s.transactions) {
       if(isTax(t)) continue;
       if(t.type==='income') {
@@ -200,7 +204,7 @@
         const stay=s.stays.find(x=>x.id===t.stayId);
         const isBookingPayment=stay && bookingCategories.includes(t.category);
         if(isBookingPayment && stay.agreed!=null && stay.agreed!=='') continue;
-        revenue+=expenseInMonth(s,t,month);
+        const value=expenseInMonth(s,t,month);revenue+=value;if(isBookingPayment)stayRevenue+=value;
       } else {
         const value=expenseInMonth(s,t,month); costs+=value;
         if(t.stayId) direct+=value; else common+=value;
@@ -216,7 +220,7 @@
     const occupied=new Set();
     for(const stay of active) for(let d=stay.checkin>a?stay.checkin:a;d<stay.checkout&&d<b;d=nextDay(d)) occupied.add(d);
     const incomplete=active.some(t=>!t.guests);
-    return { month,revenue:round(revenue),costs:round(costs),profit:round(revenue-costs),direct:round(direct),common:round(common),fixedCosts:round(fixedCosts),utilities:round(utilities),guestNights,occupied:occupied.size,stays:active.length,costPerGuest:guestNights?costs/guestNights:null,extras:round(extras),profitPerGuest:guestNights?(revenue-extras-costs)/guestNights:null,cashIn:round(cashIn),cashOut:round(cashOut),incomplete };
+    return { month,revenue:round(revenue),costs:round(costs),profit:round(revenue-costs),direct:round(direct),common:round(common),fixedCosts:round(fixedCosts),utilities:round(utilities),guestNights,occupied:occupied.size,stays:active.length,costPerGuest:guestNights?costs/guestNights:null,extras:round(extras),stayRevenue:round(stayRevenue),otherRevenue:round(revenue-stayRevenue-extras),profitPerGuest:guestNights?(stayRevenue-costs)/guestNights:null,cashIn:round(cashIn),cashOut:round(cashOut),incomplete };
   }
   function monthsForStay(stay) {
     const out=[];

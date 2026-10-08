@@ -94,3 +94,16 @@ assert.equal(A.staySummary(preferred,preferred.stays[0],today).received,0);
 assert.equal(A.monthly(preferred,'2026-06',today).extras,80);
 assert.equal(JSON.stringify(A.migrate(preferred)),JSON.stringify(preferred));
 console.log('PASS: unspecified children treated as adults; extras remain income and are excluded from stay receipts and per-guest margin.');
+
+if(fs.existsSync(privateFile)) {
+ const verified=A.migrate(JSON.parse(fs.readFileSync(privateFile,'utf8')));
+ for(const [amount,category] of [[37.5,'Colazione'],[18,'Pulizie']])assert(verified.transactions.find(t=>t.amount===amount&&t.category===category).stayId);
+ const july=A.monthly(verified,'2026-07',today);
+ close(july.stayRevenue,357.76+449.39+426);
+ close(july.otherRevenue,356.48+50);
+ const costSum=verified.transactions.filter(t=>t.type==='expense').reduce((n,t)=>n+t.amount,0);
+ const months=['2025-12',...Array.from({length:12},(_,i)=>'2026-'+String(i+1).padStart(2,'0'))];
+ close(months.reduce((n,m)=>n+A.monthly(verified,m,today).costs,0),costSum);
+ for(const m of months){const active=verified.stays.filter(t=>A.overlap(t.checkin,t.checkout,...A.range(m))>0);const monthly=A.monthly(verified,m,today);if(monthly.guestNights)close(active.reduce((n,t)=>n+monthly.common*A.overlap(t.checkin,t.checkout,...A.range(m))*t.guests/monthly.guestNights,0),monthly.common);}
+ console.log('PASS: identified stay expenses linked; no-show/day use excluded from overnight margin; cost allocations conserve totals.');
+}
