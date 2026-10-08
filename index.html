@@ -511,6 +511,7 @@
       #monthly-summary-table td.amount { white-space: normal; }
     }
   </style>
+  <link rel="stylesheet" href="mobile-refresh.css">
 </head>
 <body>
   <div class="app-shell">
@@ -535,8 +536,8 @@
     <main>
       <section class="view" id="view-home">
         <div class="page-heading">
-          <div><h1>Situazione economica</h1><p>Una vista chiara sull'andamento della struttura.</p></div>
-          <div class="field-inline"><label for="home-month">Periodo</label><input type="month" id="home-month"></div>
+          <div><p class="eyebrow">LA TUA CASA, SOTTO CONTROLLO</p><h1>Il tuo riepilogo</h1><p>Entrate, spese e piccoli dettagli. Tutto in ordine.</p></div>
+          <div class="month-picker"><label for="home-month">Periodo del riepilogo</label><div><button class="button secondary" id="previous-month" aria-label="Mese precedente">‹</button><input type="month" id="home-month"><button class="button secondary" id="next-month" aria-label="Mese successivo">›</button></div><button class="text-button" id="current-month">Torna a questo mese</button></div>
         </div>
 
         <section class="balance-panel" aria-label="Saldo totale">
@@ -578,11 +579,14 @@
           </div>
         </div>
         <div class="filter-bar">
-          <input type="search" id="movement-search" placeholder="Cerca descrizione o categoria">
+          <input type="search" id="movement-search" aria-label="Cerca movimenti" placeholder="Cerca descrizione, categoria o metodo…">
           <select id="movement-type" aria-label="Filtra per tipo"><option value="all">Entrate e uscite</option><option value="income">Solo entrate</option><option value="expense">Solo uscite</option></select>
           <select id="movement-category" aria-label="Filtra per categoria"><option value="all">Tutte le categorie</option></select>
           <input type="month" id="movement-month" aria-label="Filtra per mese">
+          <select id="movement-stay-filter" aria-label="Filtra per soggiorno"><option value="all">Tutti i soggiorni / spese</option><option value="unlinked">Non collegati a soggiorni</option></select>
+          <select id="movement-status-filter" aria-label="Filtra per pagamento"><option value="all">Avvenuti e previsti</option><option value="posted">Solo avvenuti</option><option value="planned">Previsti / da confermare</option></select>
         </div>
+        <div class="filter-feedback"><span id="movement-count" role="status"></span><button class="text-button" id="reset-filters">Azzera filtri</button></div>
         <div class="stats-grid" id="movements-summary">
           <article class="stat-card income"><span class="label">Entrate filtrate</span><strong id="movements-income">0,00 €</strong></article>
           <article class="stat-card expense"><span class="label">Uscite filtrate</span><strong id="movements-expense">0,00 €</strong></article>
@@ -752,18 +756,21 @@
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
+  <script src="accounting.js"></script>
+  <script src="manager.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     (() => {
       'use strict';
 
-      const STORAGE_KEY = 'a-casa-di-marco-manager-v1';
+      const isLocalPreview = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) && new URLSearchParams(location.search).get('preview') === '1';
+      const STORAGE_KEY = isLocalPreview ? 'a-casa-di-marco-preview-v1' : 'a-casa-di-marco-manager-v1';
       const SUPABASE_URL = 'https://vfifybgunchojyirfqez.supabase.co';
       const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_09qb8Z_OzQVmZYR3Y93xkA_sWKRBQUf';
-      const supabaseClient = window.supabase?.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+      const supabaseClient = isLocalPreview ? null : window.supabase?.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
       const categories = {
-        income: ['Prenotazione diretta', 'Booking', 'Airbnb', 'Servizio a ore', 'Tassa di soggiorno', 'Extra', 'Altro'],
-        expense: ['Pulizie', 'Lavanderia', 'Utenze', 'Internet', 'Assicurazione', 'Rimborsi', 'Manutenzione', 'Commissioni', 'Tasse', 'Tassa di soggiorno', 'Forniture', 'Colazione', 'Altro']
+        income: ['Prenotazione diretta', 'Booking', 'Airbnb', 'Servizio a ore', 'Extra', 'Altro'],
+        expense: ['Pulizie', 'Lavanderia', 'Utenze', 'Internet', 'Assicurazione', 'Rimborsi', 'Manutenzione', 'Commissioni', 'Tasse', 'Forniture', 'Colazione', 'Altro']
       };
       const utilityInfo = {
         water: { label: 'Acqua', unit: 'm³' },
@@ -1008,62 +1015,19 @@
       ];
 
       function migrateState(rawState) {
-        const sourceVersion = Number(rawState?.dataVersion) || 0;
-        const migrated = {
-          transactions: Array.isArray(rawState?.transactions) ? [...rawState.transactions] : [],
-          utilities: Array.isArray(rawState?.utilities) ? [...rawState.utilities] : [],
+        const prepared = migrateLegacyState(rawState);
+        if (rawState && !prepared.migrationSnapshot) prepared.migrationSnapshot = structuredClone(rawState);
+        return CasaAccounting.migrate(prepared);
+      }
+      function migrateLegacyState(rawState) {
+        // Existing ledgers are authoritative; never seed over saved records.
+        return {
+          ...(rawState || {}),
+          transactions: structuredClone(Array.isArray(rawState?.transactions) ? rawState.transactions : seedTransactions),
+          utilities: structuredClone(Array.isArray(rawState?.utilities) ? rawState.utilities : billUtilities),
           settings: { electricityShare: 25, ...(rawState?.settings || {}) },
-          dataVersion: sourceVersion
+          dataVersion: DATA_VERSION
         };
-        if (sourceVersion >= DATA_VERSION) return migrated;
-
-        const removedFutureIncomeIds = new Set([
-          'report-airbnb-20260620-01', 'report-airbnb-20260720-01',
-          'report-airbnb-20260804-01', 'report-airbnb-20260917-01',
-          'tourist-tax-20260619-30'
-        ]);
-        migrated.transactions = migrated.transactions.filter(item => !removedFutureIncomeIds.has(item.id));
-        const removedOldUtilityIds = new Set([
-          'usage-gas-2025-05-06-vacation',
-          'usage-water-2025-05-08-vacation',
-          'usage-water-2025-12-2026-05-vacation'
-        ]);
-        migrated.transactions = migrated.transactions.filter(item => !item.date || item.date >= ACCOUNTING_START);
-        migrated.utilities = migrated.utilities.filter(item => !removedOldUtilityIds.has(item.id));
-        migrated.utilities = migrated.utilities.filter(item => !item.date || item.date >= ACCOUNTING_START);
-
-        seedTransactions.forEach(seed => {
-          const existingIndex = migrated.transactions.findIndex(item => item.id === seed.id);
-          if (existingIndex >= 0) {
-            migrated.transactions[existingIndex] = { ...migrated.transactions[existingIndex], ...seed };
-            return;
-          }
-          const duplicate = migrated.transactions.some(item => item.type === seed.type && item.category === seed.category && Number(item.amount) === seed.amount && item.date === seed.date && item.description === seed.description && item.checkin === seed.checkin && item.checkout === seed.checkout);
-          if (!duplicate) migrated.transactions.push(seed);
-        });
-
-        billUtilities.filter(item => !item.date || item.date >= ACCOUNTING_START).forEach(seed => {
-          const existingIndex = migrated.utilities.findIndex(item => item.id === seed.id);
-          if (existingIndex >= 0) migrated.utilities[existingIndex] = { ...migrated.utilities[existingIndex], ...seed };
-          else migrated.utilities.push(seed);
-        });
-
-        const seenTransactions = new Set();
-        migrated.transactions = migrated.transactions.filter(item => {
-          const signature = [item.type, item.date, item.category, Number(item.amount).toFixed(2), item.description || '', item.checkin || '', item.checkout || ''].join('|');
-          if (seenTransactions.has(signature)) return false;
-          seenTransactions.add(signature);
-          return true;
-        });
-        const seenUtilities = new Set();
-        migrated.utilities = migrated.utilities.filter(item => {
-          const signature = [item.type, item.date, Number(item.consumption), Number(item.cost), item.periodStart || '', item.periodEnd || ''].join('|');
-          if (seenUtilities.has(signature)) return false;
-          seenUtilities.add(signature);
-          return true;
-        });
-        migrated.dataVersion = DATA_VERSION;
-        return migrated;
       }
 
       let state = loadState();
@@ -1087,7 +1051,7 @@
         if (transaction.checkin && transaction.checkout) parts.push(`${formatDate(transaction.checkin)} - ${formatDate(transaction.checkout)}`);
         return parts.join(' · ');
       };
-      const isPosted = transaction => transaction.date <= today && (transaction.status !== 'planned' || transaction.date < today);
+      const isPosted = transaction => CasaAccounting.posted(transaction, today);
 
       function loadState() {
         try {
@@ -1098,6 +1062,8 @@
           localStorage.setItem(DATA_MIGRATION_KEY, 'imported');
           return loaded;
         } catch (_) {
+          const unreadable=localStorage.getItem(STORAGE_KEY);
+          if(unreadable)localStorage.setItem(STORAGE_KEY+'-unreadable-backup-'+Date.now(),unreadable);
           const initial = migrateState({
             transactions: [...seedTransactions],
             utilities: billUtilities.filter(item => !item.date || item.date >= ACCOUNTING_START)
@@ -1186,7 +1152,7 @@
               localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
               renderAll();
             }
-            if (remoteVersion < DATA_VERSION) {
+            if (JSON.stringify(remoteState) !== JSON.stringify(data.data)) {
               const { error: migrationError } = await supabaseClient.from('app_state').upsert({
                 user_id: currentUser.id,
                 data: remoteState,
@@ -1223,6 +1189,14 @@
       }
 
       async function initializeAuth() {
+        if (isLocalPreview) {
+          setSyncStatus('Anteprima locale');
+          const banner = document.createElement('div');
+          banner.className = 'preview-banner';
+          banner.textContent = 'Anteprima locale · Copia dei dati inclusi nel progetto. Le prove restano in questo browser e non vengono sincronizzate.';
+          document.querySelector('main').prepend(banner);
+          return;
+        }
         if (!supabaseClient) {
           showAuth('Impossibile caricare il servizio di sincronizzazione. Controlla la connessione.');
           $('#auth-message').classList.add('error');
@@ -1279,6 +1253,12 @@
         $('#transaction-dialog-title').textContent = transaction ? 'Modifica movimento' : 'Nuovo movimento';
         $('#transaction-date').value = transaction?.date || today;
         updateTransactionFormMode(type, transaction?.category || '');
+        $('#transaction-stay').innerHTML = '<option value="">Spesa della casa / movimento non collegato</option>' + state.stays.map(s => `<option value="${escapeHtml(s.id)}">${escapeHtml(s.name)} · ${formatDate(s.checkin)}</option>`).join('');
+        $('#transaction-stay').value = transaction?.stayId || '';
+        $('#transaction-status').value = transaction?.status || 'posted';
+        $('#transaction-period-start').value = transaction?.periodStart || '';
+        $('#transaction-period-end').value = transaction?.periodEnd || '';
+        $('#transaction-allocation-note').textContent = transaction?.allocations?.length ? 'Ripartizione storica: ' + transaction.allocations.map(p => `${p.month}: ${euro.format(p.amount)}`).join(' · ') + '. Inserisci un periodo per sostituirla con una ripartizione per giorni.' : 'Per una spesa che copre più mesi, indica il periodo. La data del pagamento resta separata.';
         if (transaction) {
           $('#transaction-amount').value = transaction.amount;
           $('#transaction-method').value = transaction.method || 'Contanti';
@@ -1319,8 +1299,7 @@
       }
 
       function guestNightsForPeriod(start, end) {
-        return state.transactions.filter(t => t.type === 'income' && Number(t.guests) > 0 && t.checkin && t.checkout)
-          .reduce((sum, t) => sum + Number(t.guests) * overlapDays(t.checkin, t.checkout, start, end), 0);
+        return state.stays.reduce((sum, s) => sum + Number(s.guests || 0) * overlapDays(s.checkin, s.checkout, start, end), 0);
       }
 
       function utilityPersonDays(item) {
@@ -1392,6 +1371,7 @@
         renderMovements();
         renderUtilities();
         renderSettings();
+        window.CasaUI?.render();
       }
 
       function renderHome() {
@@ -1421,7 +1401,7 @@
         $('#recent-list').innerHTML = recent.length ? recent.map(t => `
           <div class="transaction-row">
             <span class="type-dot ${t.type}"></span>
-            <div class="transaction-copy"><strong>${escapeHtml(t.description)}</strong><span>${escapeHtml(t.category)}</span></div>
+            <div class="transaction-copy"><strong>${escapeHtml(t.description)}</strong><span>${escapeHtml(t.category)} · ${formatDate(t.date)}</span></div>
             <span class="transaction-date">${formatDate(t.date)}</span>
             <span class="transaction-amount ${t.type}">${t.type === 'income' ? '+' : '−'} ${euro.format(t.amount)}</span>
           </div>`).join('') : '<div class="empty-state"><strong>Nessun movimento</strong>Le entrate e le uscite recenti compariranno qui.</div>';
@@ -1436,6 +1416,8 @@
       }
 
       function renderMovements() {
+        const stayFilter = $('#movement-stay-filter').value;
+        const statusFilter = $('#movement-status-filter').value;
         const query = $('#movement-search').value.trim().toLowerCase();
         const type = $('#movement-type').value;
         const category = $('#movement-category').value;
@@ -1447,7 +1429,7 @@
 
         const filtered = state.transactions.filter(t => {
           const searchable = `${t.description} ${t.category} ${t.method || ''}`.toLowerCase();
-          return (!query || searchable.includes(query)) && (type === 'all' || t.type === type) && (category === 'all' || t.category === category) && (!month || t.date.startsWith(month));
+          return (!query || searchable.includes(query)) && (type === 'all' || t.type === type) && (category === 'all' || t.category === category) && (!month || t.date.startsWith(month)) && (stayFilter === 'all' || (stayFilter === 'unlinked' ? !t.stayId : t.stayId === stayFilter)) && (statusFilter === 'all' || (statusFilter === 'posted' ? isPosted(t) : !isPosted(t)));
         }).sort((a,b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt);
 
         const incomeTotal = filtered.filter(t => t.type === 'income').reduce((sum, t) => sum + Number(t.amount), 0);
@@ -1468,6 +1450,7 @@
             <td class="m-amount ${t.type}">${(t.type === 'income' ? '+' : '-')} ${euro.format(t.amount).replace(/\u00A0/g, ' ')}</td>
             <td class="m-actions"><div class="row-actions"><button class="edit-button" data-edit-transaction="${t.id}">Modifica</button><button class="delete-icon" data-delete-transaction="${t.id}" aria-label="Elimina movimento" title="Elimina">×</button></div></td>
           </tr>`).join('');
+        $('#movement-count').textContent = `${filtered.length} ${filtered.length === 1 ? 'movimento trovato' : 'movimenti trovati'}`;
         $('#movements-empty').hidden = filtered.length > 0;
         $('#movements-summary').hidden = filtered.length === 0;
       }
@@ -1534,7 +1517,25 @@
 
       $('#home-month').value = currentMonth;
       $('#home-month').addEventListener('change', renderHome);
-      ['movement-search', 'movement-type', 'movement-category', 'movement-month'].forEach(id => $(`#${id}`).addEventListener('input', renderMovements));
+      function moveMonth(offset) {
+        const date = new Date(`${$('#home-month').value || currentMonth}-01T12:00:00`);
+        date.setMonth(date.getMonth() + offset);
+        $('#home-month').value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        renderHome();
+      }
+      $('#previous-month').addEventListener('click', () => moveMonth(-1));
+      $('#next-month').addEventListener('click', () => moveMonth(1));
+      $('#current-month').addEventListener('click', () => { $('#home-month').value = currentMonth; renderHome(); });
+      $('#reset-filters').addEventListener('click', () => {
+        $('#movement-search').value = '';
+        $('#movement-month').value = '';
+        $('#movement-type').value = 'all';
+        $('#movement-category').value = 'all';
+        $('#movement-stay-filter').value = 'all';
+        $('#movement-status-filter').value = 'all';
+        renderMovements();
+      });
+      ['movement-search', 'movement-type', 'movement-category', 'movement-month', 'movement-stay-filter', 'movement-status-filter'].forEach(id => $(`#${id}`).addEventListener('input', renderMovements));
 
       $('#transaction-form').addEventListener('submit', event => {
         event.preventDefault();
@@ -1550,9 +1551,24 @@
           return;
         }
         const existing = state.transactions.find(t => t.id === editingTransactionId);
+        const periodStart = $('#transaction-period-start').value;
+        const periodEnd = $('#transaction-period-end').value;
+        if (Boolean(periodStart) !== Boolean(periodEnd) || (periodStart && periodEnd < periodStart)) {
+          alert('Inserisci entrambe le date del periodo, con la fine non precedente all’inizio.'); return;
+        }
+        const stayId = $('#transaction-stay').value;
+        if (stayId && periodStart) { alert('Scegli il soggiorno oppure un periodo: per un soggiorno si usano le sue notti.'); return; }
+        const linkedStay = state.stays.find(s => s.id === stayId);
+        if (linkedStay?.basis === 'net' && type === 'expense' && $('#transaction-category-input').value === 'Commissioni') {
+          alert('Questo soggiorno usa ricavi già al netto delle commissioni. Per registrarne una separatamente, modifica prima la base del soggiorno e i suoi importi in lordo.'); return;
+        }
         const transaction = {
+          ...existing,
           id: editingTransactionId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
           type,
+          stayId,
+          status: $('#transaction-status').value,
+          periodStart, periodEnd,
           amount: Number($('#transaction-amount').value),
           date: $('#transaction-date').value,
           category: $('#transaction-category-input').value,
@@ -1565,17 +1581,30 @@
           createdAt: existing?.createdAt || Date.now(),
           updatedAt: editingTransactionId ? Date.now() : null
         };
+        if (periodStart || stayId) delete transaction.allocations;
+        else if (existing?.allocations && Number(existing.amount) !== transaction.amount) {
+          transaction.allocations = existing.allocations.map(p => ({...p,amount:Math.round(p.amount * transaction.amount / existing.amount * 100)/100}));
+          const parts=transaction.allocations;
+          parts[parts.length-1].amount=Math.round((transaction.amount-parts.slice(0,-1).reduce((sum,p)=>sum+p.amount,0))*100)/100;
+        }
         if (editingTransactionId) {
           state.transactions = state.transactions.map(t => t.id === editingTransactionId ? transaction : t);
         } else {
           state.transactions.push(transaction);
         }
+        state.utilities = state.utilities.map(u => u.transactionId === transaction.id ? {
+          ...u, cost: transaction.amount,
+          periodStart: transaction.periodStart || u.periodStart,
+          periodEnd: transaction.periodEnd ? CasaAccounting.nextDay(transaction.periodEnd) : u.periodEnd,
+          date: transaction.periodEnd || u.date
+        } : u);
         $('#transaction-dialog').close();
         saveState(editingTransactionId ? 'Movimento modificato' : (type === 'income' ? 'Entrata salvata' : 'Uscita salvata'));
         editingTransactionId = null;
       });
 
       $('#add-utility').addEventListener('click', () => {
+        window.CasaUI.openBill(); return;
         $('#utility-form').reset();
         $('#utility-date').value = today;
         $('#utility-period-start').value = today.slice(0, 8) + '01';
@@ -1612,6 +1641,7 @@
         }
         if (transactionButton && confirm('Vuoi eliminare questo movimento?')) {
           state.transactions = state.transactions.filter(t => t.id !== transactionButton.dataset.deleteTransaction);
+          state.utilities = state.utilities.filter(u => u.transactionId !== transactionButton.dataset.deleteTransaction);
           saveState('Movimento eliminato');
         }
         if (utilityButton && confirm('Vuoi eliminare questo consumo?')) {
@@ -1633,11 +1663,22 @@
             const newTransactions = imported.transactions.filter(item => item?.id && !transactionIds.has(item.id));
             const newUtilities = imported.utilities.filter(item => item?.id && !utilityIds.has(item.id));
             state = {
+              ...state,
               transactions: [...state.transactions, ...newTransactions],
               utilities: [...state.utilities, ...newUtilities],
               settings: { ...(state.settings || {}), ...(imported.settings || {}) },
               dataVersion: DATA_VERSION
             };
+            const stayIds = new Set(state.stays.map(s => s.id));
+            state.stays.push(...(Array.isArray(imported.stays) ? imported.stays.filter(s => s?.id && !stayIds.has(s.id)) : []));
+            if (!imported.ledgerVersion) {
+              const recovered = CasaAccounting.migrate({transactions:newTransactions,utilities:[],settings:{}});
+              state.transactions = state.transactions.map(t => recovered.transactions.find(r=>r.id===t.id) || t);
+              state.stays.push(...recovered.stays.filter(s=>!state.stays.some(x=>x.id===s.id)));
+            }
+            state.taxPayments = { ...(imported.taxPayments || {}), ...(state.taxPayments || {}) };
+            if (!state.taxRules?.length && Array.isArray(imported.taxRules)) state.taxRules = imported.taxRules;
+            state = CasaAccounting.migrate(state);
             saveState(`${newTransactions.length + newUtilities.length} nuove voci importate`);
           }
         } catch (_) { alert('Il file selezionato non è un backup valido.'); }
@@ -1651,13 +1692,14 @@
       });
 
       $('#save-settings').addEventListener('click', () => {
-        state.settings = { ...(state.settings || {}), electricityShare: Number($('#electricity-share').value) || 25 };
+        if (!$('#electricity-share').reportValidity()) return;
+        state.settings = { ...(state.settings || {}), electricityShare: Number($('#electricity-share').value) };
         saveState('Impostazioni salvate');
       });
 
       $('#clear-data').addEventListener('click', () => {
         if (confirm('Confermi di voler cancellare tutti i dati? Questa operazione non si può annullare.')) {
-          state = { transactions: [], utilities: [], settings: { electricityShare: 25 }, dataVersion: DATA_VERSION };
+          state = { transactions: [], utilities: [], stays: [], ledgerVersion: 1, confirmedCorrectionsVersion: 4, taxArchive: [], taxPayments: {}, taxRules: state.taxRules || [], settings: { electricityShare: 25 }, dataVersion: DATA_VERSION };
           saveState('Tutti i dati sono stati cancellati');
         }
       });
@@ -1767,9 +1809,18 @@
       });
       setInterval(pullRemoteState, 15000);
 
+      window.CasaUI.mount({getState:()=>state,save:saveState,view:setView,openTransaction,today,download});
       updateTransactionFormMode('income');
       renderAll();
       initializeAuth();
+      if (isLocalPreview) fetch('.local-data/preview-state.json', {cache:'no-store'}).then(r=>r.ok?r.json():null).then(source=>{
+        if (!source || localStorage.getItem(STORAGE_KEY+'-source')==='movimenti-20261008-v2') return;
+        state=migrateState(source);
+        localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
+        localStorage.setItem(STORAGE_KEY+'-source','movimenti-20261008-v2');
+        renderAll();
+        document.querySelector('.preview-banner').textContent='Anteprima locale · Copia privata dei 95 movimenti del CSV. Nessuna sincronizzazione con il tuo account.';
+      }).catch(()=>{});
     })();
   </script>
 </body>
