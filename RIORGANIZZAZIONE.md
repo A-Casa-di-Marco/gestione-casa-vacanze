@@ -69,3 +69,5 @@ Supabase. Le modifiche non sono state pubblicate.
 La migrazione non reinserisce i dati iniziali in un archivio già esistente e non elimina o deduplica movimenti autonomamente. Conserva il backup originale. Le sole rettifiche monetarie concordate sono la separazione 553,27 € in 459,61 € e 93,66 € no-show, la rimozione dell’acconto duplicato 100 € e l’archiviazione delle tasse di soggiorno. Resta 436 € per il soggiorno di settembre. Il check-out errato del soggiorno 3 luglio viene corretto al 10 luglio. Gli importi netti registrati non subiscono una seconda commissione.
 
 Il resoconto Booking contiene una trattenuta di 146,99 € da classificare: non viene inventata una spesa né modificato il relativo incasso registrato.
+
+Preferenze aggiornate: esenzioni non indicate = tutti adulti per la stima; extra separati dai soggiorni, inclusi nel saldo casa. Totale concordato facoltativo, nessun avviso generico. Conguaglio acqua 12 € ripartito sui giorni dicembre–maggio. Nessun movimento creato per la trattenuta Booking non classificata.

@@ -10,6 +10,7 @@
   const isTax = t => t.category === 'Tassa di soggiorno';
   const posted = (t, today) => t.status !== 'planned' && t.date <= today;
   const bookingCategories = ['Booking', 'Airbnb', 'Prenotazione diretta'];
+  const isExtra = t => t.type==='income' && (t.category==='Extra'||/late check|navetta|rimborso danni/i.test(t.description||''));
   const fixed = ['Internet', 'Assicurazione'];
   // Explicit historical allocations recovered from the repository. Cash amounts remain unchanged.
   const schedules = {
@@ -25,7 +26,7 @@
   function migrate(input) {
     const s = structuredClone(input);
     correctLedger(s);
-    if (s.ledgerVersion >= 1) { s.stays ||= []; return applyConfirmedCorrections(s); }
+    if (s.ledgerVersion >= 1) { s.stays ||= []; return ownerPreferences(applyConfirmedCorrections(s)); }
     s.stays ||= [];
     s.migrationSnapshot ||= { transactions: structuredClone(s.transactions), utilities: structuredClone(s.utilities), settings: structuredClone(s.settings) };
     for (const t of s.transactions) {
@@ -63,7 +64,21 @@
       }
     }
     s.ledgerVersion=1;
-    return applyConfirmedCorrections(s);
+    return ownerPreferences(applyConfirmedCorrections(s));
+  }
+  function ownerPreferences(s) {
+    for(const stay of s.stays) {
+      if(stay.taxableGuests==null && Number(stay.guests)>0){stay.taxableGuests=Math.max(0,Number(stay.guests)-Number(stay.childrenUnder12||0));stay.taxAdultsAssumed=stay.childrenUnder12==null;}
+    }
+    for(const t of s.transactions) {
+      if(isExtra(t)&&t.stayId){t.extraOriginalStayId ||= t.stayId;t.stayId=null;}
+      if(t.type==='expense'&&(t.id==='bill-water-2026-06-08-vacation'||t.date==='2026-07-07'&&Number(t.amount)===12)&&!t.ownerPeriodApplied) {
+        t.previousAllocations ||= structuredClone(t.allocations||[]);
+        delete t.allocations;t.periodStart='2025-12-01';t.periodEnd='2026-05-31';t.ownerPeriodApplied=true;
+        t.allocationNote='Conguaglio dicembre–maggio: ripartizione per giorni; date precise da fattura.';
+      }
+    }
+    return s;
   }
   function correctLedger(s) {
     if(s.confirmedCorrectionsVersion>=4)return;
@@ -175,12 +190,13 @@
   function monthly(s,month,today) {
     const [a,b]=range(month);
     const active=s.stays.filter(t=>overlap(t.checkin,t.checkout,a,b)>0);
-    let revenue=0, costs=0, direct=0, common=0, fixedCosts=0, utilities=0;
+    let revenue=0, costs=0, direct=0, common=0, fixedCosts=0, utilities=0, extras=0;
     // Explicit agreed revenue is separate from cash receipts. Historical records use recorded income.
     for(const stay of active) if(stay.agreed !== null && stay.agreed !== '' && stay.agreed !== undefined) revenue+=allocateMoney(Number(stay.agreed),stay.checkin,stay.checkout,month);
     for(const t of s.transactions) {
       if(isTax(t)) continue;
       if(t.type==='income') {
+        if(isExtra(t)){const value=t.date?.startsWith(month)?Number(t.amount):0;extras+=value;revenue+=value;continue;}
         const stay=s.stays.find(x=>x.id===t.stayId);
         const isBookingPayment=stay && bookingCategories.includes(t.category);
         if(isBookingPayment && stay.agreed!=null && stay.agreed!=='') continue;
@@ -199,8 +215,8 @@
     const cashOut=cash.filter(t=>t.type==='expense').reduce((n,t)=>n+Number(t.amount),0);
     const occupied=new Set();
     for(const stay of active) for(let d=stay.checkin>a?stay.checkin:a;d<stay.checkout&&d<b;d=nextDay(d)) occupied.add(d);
-    const incomplete=active.some(t=>!t.guests || t.review || t.agreed==null) || s.transactions.some(t=>!isTax(t)&&!t.dayUse&&!t.stayId&&t.type==='income'&&t.date.startsWith(month));
-    return { month,revenue:round(revenue),costs:round(costs),profit:round(revenue-costs),direct:round(direct),common:round(common),fixedCosts:round(fixedCosts),utilities:round(utilities),guestNights,occupied:occupied.size,stays:active.length,costPerGuest:guestNights?costs/guestNights:null,profitPerGuest:guestNights?(revenue-costs)/guestNights:null,cashIn:round(cashIn),cashOut:round(cashOut),incomplete };
+    const incomplete=active.some(t=>!t.guests);
+    return { month,revenue:round(revenue),costs:round(costs),profit:round(revenue-costs),direct:round(direct),common:round(common),fixedCosts:round(fixedCosts),utilities:round(utilities),guestNights,occupied:occupied.size,stays:active.length,costPerGuest:guestNights?costs/guestNights:null,extras:round(extras),profitPerGuest:guestNights?(revenue-extras-costs)/guestNights:null,cashIn:round(cashIn),cashOut:round(cashOut),incomplete };
   }
   function monthsForStay(stay) {
     const out=[];
@@ -208,7 +224,7 @@
     return out;
   }
   function staySummary(s,stay,today) {
-    const linked=s.transactions.filter(t=>t.stayId===stay.id&&!isTax(t));
+    const linked=s.transactions.filter(t=>t.stayId===stay.id&&!isTax(t)&&!isExtra(t));
     const receipts=linked.filter(t=>t.type==='income'&&posted(t,today));
     const bookingReceived=receipts.filter(t=>bookingCategories.includes(t.category)).reduce((n,t)=>n+Number(t.amount),0);
     const agreed=stay.agreed==null||stay.agreed===''?null:Number(stay.agreed);
@@ -223,15 +239,15 @@
   }
   function warnings(s,today) {
     const list=[];
-    const review=s.stays.filter(t=>t.review||!t.guests||t.agreed==null);
-    if(review.length) list.push(`${review.length} soggiorni da completare: verifica ospiti e importo complessivo. Gli importi storici Booking e Airbnb sono già netti, come confermato; le commissioni non vengono sottratte di nuovo.`);
+    const review=s.stays.filter(t=>!t.guests&&t.checkin>='2026-01-01');
+    if(review.length) list.push(`${review.length} soggiorni senza numero ospiti: serve per calcolare le presenze.`);
     if(s.transactions.some(t=>t.id==='manual-direct-20260613'&&!t.dayUse)) list.push('13 giugno: permanenza diurna da chiarire, esclusa dal conteggio dei pernottamenti.');
     if(s.transactions.some(t=>t.allocationNote)) list.push('Le ripartizioni delle bollette sono stime recuperate dalla repo. Acqua gennaio: usati i 44 € del movimento; il vecchio dettaglio consumi riporta 21,31 €. Conguaglio da 12 € attribuito a maggio, da verificare.');
     const overdue=s.transactions.filter(t=>t.status==='planned'&&t.date<=today);
     if(overdue.length) list.push(`${overdue.length} pagamenti previsti con data passata: inclusi nei costi/ricavi previsti, esclusi dagli incassi e pagamenti confermati. Confermali dal registro quando avvenuti.`);
     return list;
   }
-    const api={migrate,days,range,nextDay,overlap,monthly,presences,staySummary,warnings,posted,isTax,expenseInMonth,quarterTax};
+    const api={migrate,days,range,nextDay,overlap,monthly,presences,staySummary,warnings,posted,isTax,isExtra,expenseInMonth,quarterTax};
   if(typeof module!=='undefined') module.exports=api;
   root.CasaAccounting=api;
 })(typeof window!=='undefined'?window:globalThis);

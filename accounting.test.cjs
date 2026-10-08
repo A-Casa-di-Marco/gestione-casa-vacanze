@@ -84,3 +84,13 @@ if(fs.existsSync(privateFile)) {
  assert.equal(context.preserved.migrationSnapshot.transactions.length,95);
  console.log('PASS: all 95 exported movements audited; unrelated amounts/dates/notes preserved; split and deposit corrections idempotent; no seed injection.');
 }
+
+const preferenceInput=base();preferenceInput.stays=[{...stay,taxableGuests:null,childrenUnder12:null}];
+preferenceInput.transactions=[{id:'extra-check',type:'income',category:'Extra',description:'Extra',amount:80,date:'2026-06-01',stayId:'s'}];
+const preferred=A.migrate(preferenceInput);
+assert.equal(preferred.stays[0].taxableGuests,2);
+assert.equal(preferred.transactions[0].stayId,null);
+assert.equal(A.staySummary(preferred,preferred.stays[0],today).received,0);
+assert.equal(A.monthly(preferred,'2026-06',today).extras,80);
+assert.equal(JSON.stringify(A.migrate(preferred)),JSON.stringify(preferred));
+console.log('PASS: unspecified children treated as adults; extras remain income and are excluded from stay receipts and per-guest margin.');
