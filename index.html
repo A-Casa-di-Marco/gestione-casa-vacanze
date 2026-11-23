@@ -657,6 +657,12 @@
             <div class="setting-row"><div class="form-field"><label for="electricity-share">Quota luce casa vacanze (%)</label><input id="electricity-share" type="number" min="0" max="100" step="1" inputmode="decimal"></div><button class="button secondary" id="save-settings" type="button">Salva</button></div>
           </section>
           <section class="panel">
+            <h2>Codice di accesso</h2>
+            <p>Scegli il codice a 6 cifre da usare al posto della password per entrare da qualsiasi dispositivo. Funziona solo dopo aver effettuato l'accesso con email e password.</p>
+            <div class="setting-row"><div class="form-field"><label for="access-code">Nuovo codice</label><input id="access-code" type="password" inputmode="numeric" maxlength="12" autocomplete="new-password" placeholder="6 cifre"></div><button class="button secondary" id="save-access-code" type="button">Salva codice</button></div>
+            <p class="auth-message" id="access-code-message" aria-live="polite"></p>
+          </section>
+          <section class="panel">
             <h2>Cancella tutti i dati</h2>
             <p>Questa operazione elimina definitivamente movimenti e consumi presenti su questo dispositivo.</p>
             <div class="settings-actions"><button class="button danger" id="clear-data">Cancella dati</button></div>
@@ -727,11 +733,11 @@
       <div class="auth-brand">
         <div class="brand-mark">A</div>
         <h2>Gestione Casa Vacanze</h2>
-        <p>Accedi per sincronizzare i dati su tutti i dispositivi.</p>
+        <p>Accedi con email e codice per sincronizzare i dati su tutti i dispositivi.</p>
       </div>
       <div class="dialog-body">
         <div class="form-field"><label for="auth-email">Email</label><input id="auth-email" type="email" autocomplete="email" required></div>
-        <div class="form-field" style="margin-top:12px"><label for="auth-password">Password</label><input id="auth-password" type="password" minlength="8" autocomplete="current-password" required></div>
+        <div class="form-field" style="margin-top:12px"><label for="auth-password">Codice o password</label><input id="auth-password" type="password" autocomplete="current-password" placeholder="Codice a 6 cifre o password" required></div>
         <div class="auth-actions">
           <button class="button secondary" id="signup-button" type="button">Crea account</button>
           <button class="button" type="submit">Accedi</button>
@@ -747,12 +753,12 @@
     <form id="reset-password-form">
       <div class="auth-brand">
         <div class="brand-mark">A</div>
-        <h2>Imposta nuova password</h2>
-        <p>Inserisci la nuova password per accedere.</p>
+        <h2>Imposta password o codice</h2>
+        <p>Inserisci la nuova password o il codice per accedere.</p>
       </div>
       <div class="dialog-body">
-        <div class="form-field"><label for="reset-password">Nuova password</label><input id="reset-password" type="password" minlength="8" autocomplete="new-password" required></div>
-        <div class="form-field" style="margin-top:12px"><label for="reset-password-confirm">Conferma password</label><input id="reset-password-confirm" type="password" minlength="8" autocomplete="new-password" required></div>
+        <div class="form-field"><label for="reset-password">Nuova password o codice</label><input id="reset-password" type="password" minlength="6" autocomplete="new-password" required></div>
+        <div class="form-field" style="margin-top:12px"><label for="reset-password-confirm">Conferma password o codice</label><input id="reset-password-confirm" type="password" minlength="6" autocomplete="new-password" required></div>
         <div class="auth-actions"><button type="submit" class="button">Aggiorna password</button></div>
         <p class="auth-message" id="reset-password-message" aria-live="polite"></p>
       </div>
@@ -1196,6 +1202,7 @@
 
       async function handleAuthenticated(user) {
         currentUser = user;
+        if (user.email) localStorage.setItem('a-casa-di-marco-email', user.email);
         const status = $('#sync-status');
         status.classList.remove('clickable');
         status.removeAttribute('role');
@@ -1221,14 +1228,16 @@
           $('#auth-message').classList.add('error');
           return;
         }
+        const savedEmail = localStorage.getItem('a-casa-di-marco-email');
+        if (savedEmail) $('#auth-email').value = savedEmail;
         const { data, error } = await supabaseClient.auth.getSession();
         if (error) {
-          setLoggedOut(error.message);
+          showAuth(error.message);
           $('#auth-message').classList.add('error');
         } else if (data.session?.user) {
           await handleAuthenticated(data.session.user);
         } else {
-          setLoggedOut();
+          showAuth();
         }
         supabaseClient.auth.onAuthStateChange((event, session) => {
           if (event === 'PASSWORD_RECOVERY') {
@@ -1791,8 +1800,8 @@
         const password = $('#reset-password').value;
         const confirm = $('#reset-password-confirm').value;
         const message = $('#reset-password-message');
-        if (password.length < 8) {
-          message.textContent = 'La password deve avere almeno 8 caratteri.';
+        if (password.length < 6) {
+          message.textContent = 'La password o il codice devono avere almeno 6 caratteri.';
           message.classList.add('error');
           return;
         }
@@ -1816,6 +1825,33 @@
           await supabaseClient.auth.signOut();
           showAuth('Password aggiornata. Accedi con la nuova password.');
         }
+      });
+
+      $('#save-access-code').addEventListener('click', async () => {
+        const input = $('#access-code');
+        const message = $('#access-code-message');
+        const code = input.value.trim();
+        message.classList.remove('error');
+        if (!currentUser) {
+          message.textContent = 'Prima accedi con email e password, poi imposta il codice.';
+          message.classList.add('error');
+          return;
+        }
+        if (!/^\d{6,}$/.test(code)) {
+          message.textContent = 'Il codice deve avere almeno 6 cifre.';
+          message.classList.add('error');
+          return;
+        }
+        message.textContent = 'Salvataggio...';
+        const { error } = await supabaseClient.auth.updateUser({ password: code });
+        if (error) {
+          message.textContent = error.message;
+          message.classList.add('error');
+          return;
+        }
+        input.value = '';
+        message.textContent = 'Codice salvato. Ora entri con email e codice.';
+        showToast('Codice di accesso salvato');
       });
 
       $('#logout-button').addEventListener('click', async () => {
