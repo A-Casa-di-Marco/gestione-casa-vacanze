@@ -327,6 +327,9 @@
     .type-switch input:focus-visible + label { outline: 3px solid rgba(8, 127, 91, 0.2); outline-offset: 2px; }
     .dialog-actions { display: flex; justify-content: flex-end; gap: 9px; margin-top: 20px; }
     .auth-dialog { width: min(430px, calc(100% - 28px)); }
+    .auth-close { position: absolute; top: 10px; right: 10px; }
+    .sync-status.clickable { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+    .sync-status.clickable:focus-visible { outline: 2px solid #fff; outline-offset: 2px; border-radius: 4px; }
     .auth-brand { padding: 24px 22px 8px; text-align: center; }
     .auth-brand .brand-mark { margin: 0 auto 12px; }
     .auth-brand h2 { margin: 0 0 5px; }
@@ -527,7 +530,7 @@
         <button class="nav-button" data-view="settings">Dati</button>
       </nav>
       <div class="account-panel">
-        <span class="sync-status" id="sync-status">Accesso richiesto</span>
+        <span class="sync-status" id="sync-status">Accedi</span>
         <span class="account-email" id="account-email"></span>
         <button class="account-button" id="logout-button" hidden>Esci</button>
       </div>
@@ -720,6 +723,7 @@
 
   <dialog class="auth-dialog" id="auth-dialog">
     <form id="auth-form">
+      <button type="button" class="dialog-close auth-close" data-close-dialog aria-label="Chiudi">×</button>
       <div class="auth-brand">
         <div class="brand-mark">A</div>
         <h2>Gestione Casa Vacanze</h2>
@@ -734,6 +738,7 @@
         </div>
         <button type="button" class="text-button" id="forgot-password-button" style="margin-top:14px; width:100%;">Password dimenticata?</button>
         <p class="auth-message" id="auth-message" aria-live="polite"></p>
+        <button type="button" class="text-button" data-close-dialog style="margin-top:10px; width:100%;">Continua senza accesso</button>
       </div>
     </form>
   </dialog>
@@ -1170,18 +1175,32 @@
         }
       }
 
-      function showAuth(message = '') {
+      function setLoggedOut(message = '') {
         currentUser = null;
         $('#logout-button').hidden = true;
         $('#account-email').textContent = '';
         $('#auth-message').textContent = message;
         $('#auth-message').classList.remove('error');
-        setSyncStatus('Accesso richiesto');
+        const status = $('#sync-status');
+        status.textContent = 'Accedi';
+        status.classList.add('clickable');
+        status.setAttribute('role', 'button');
+        status.setAttribute('tabindex', '0');
+        status.title = 'Accedi per sincronizzare i dati';
+      }
+
+      function showAuth(message = '') {
+        setLoggedOut(message);
         if (!$('#auth-dialog').open) $('#auth-dialog').showModal();
       }
 
       async function handleAuthenticated(user) {
         currentUser = user;
+        const status = $('#sync-status');
+        status.classList.remove('clickable');
+        status.removeAttribute('role');
+        status.removeAttribute('tabindex');
+        status.removeAttribute('title');
         $('#account-email').textContent = user.email || '';
         $('#logout-button').hidden = false;
         if ($('#auth-dialog').open) $('#auth-dialog').close();
@@ -1198,18 +1217,18 @@
           return;
         }
         if (!supabaseClient) {
-          showAuth('Impossibile caricare il servizio di sincronizzazione. Controlla la connessione.');
+          setLoggedOut('Impossibile caricare il servizio di sincronizzazione. Controlla la connessione.');
           $('#auth-message').classList.add('error');
           return;
         }
         const { data, error } = await supabaseClient.auth.getSession();
         if (error) {
-          showAuth(error.message);
+          setLoggedOut(error.message);
           $('#auth-message').classList.add('error');
         } else if (data.session?.user) {
           await handleAuthenticated(data.session.user);
         } else {
-          showAuth();
+          setLoggedOut();
         }
         supabaseClient.auth.onAuthStateChange((event, session) => {
           if (event === 'PASSWORD_RECOVERY') {
@@ -1217,7 +1236,7 @@
             $('#auth-message').textContent = '';
             if (!$('#reset-password-dialog').open) $('#reset-password-dialog').showModal();
           } else if (event === 'SIGNED_OUT' || !session?.user) {
-            showAuth();
+            setLoggedOut();
           }
         });
       }
@@ -1802,6 +1821,15 @@
       $('#logout-button').addEventListener('click', async () => {
         if (localDirty) await pushRemoteState();
         await supabaseClient.auth.signOut();
+      });
+
+      const openAuthFromStatus = () => { if (!currentUser) showAuth(); };
+      $('#sync-status').addEventListener('click', openAuthFromStatus);
+      $('#sync-status').addEventListener('keydown', event => {
+        if (!currentUser && (event.key === 'Enter' || event.key === ' ')) {
+          event.preventDefault();
+          openAuthFromStatus();
+        }
       });
 
       document.addEventListener('visibilitychange', () => {
