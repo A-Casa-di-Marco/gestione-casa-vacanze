@@ -1212,6 +1212,7 @@
         $('#logout-button').hidden = false;
         if ($('#auth-dialog').open) $('#auth-dialog').close();
         await pullRemoteState();
+        applyNovemberPatch();
       }
 
       async function initializeAuth() {
@@ -1873,9 +1874,40 @@
       });
       setInterval(pullRemoteState, 15000);
 
+      // Patch una tantum del 23/11/2026: voci comunicate dal proprietario.
+      // Il flag salvato nello stato evita di riaggiungerle se vengono eliminate.
+      const NOVEMBER_PATCH = {
+        transactions: [
+          { id:'manutenzione-20261113-materasso', type:'expense', amount:86.72, date:'2026-11-13', category:'Manutenzione', method:'Da confermare', description:'Materasso per il letto', notes:'', guests:null, checkin:'', checkout:'', status:'posted', createdAt:1795436539105 },
+          { id:'manutenzione-20261113-rete-letto', type:'expense', amount:33.68, date:'2026-11-13', category:'Manutenzione', method:'Da confermare', description:'Rete per il letto', notes:'', guests:null, checkin:'', checkout:'', status:'posted', createdAt:1795436539106 },
+          { id:'bolletta-gas-2026-07-08', type:'expense', amount:63.67, date:'2026-09-28', category:'Utenze', method:'Addebito automatico', description:'Gas casa vacanze - lug/ago', notes:'Scadenza 28/09/2026; consumo 14 Smc; periodo 01/07-31/08/2026', guests:null, checkin:'', checkout:'', status:'posted', periodStart:'2026-07-01', periodEnd:'2026-08-31', billType:'gas', billTotal:63.67, billShare:100, createdAt:1795436949652 },
+          { id:'bolletta-luce-2026-08-09', type:'expense', amount:169.23, date:'2026-11-11', category:'Utenze', method:'Addebito automatico', description:'Luce quota casa vacanze 25% - ago/set', notes:'Fattura 5481782158 del 27/10/2026; scadenza 11/11/2026; 2.242 kWh; totale bolletta 676,91 € (escluso canone TV 18 €)', guests:null, checkin:'', checkout:'', status:'posted', periodStart:'2026-08-01', periodEnd:'2026-09-30', billType:'electricity', billTotal:676.91, billShare:25, createdAt:1795436949654 }
+        ],
+        utilities: [
+          { id:'utility-2026-07-08-gas', transactionId:'bolletta-gas-2026-07-08', type:'gas', date:'2026-08-31', periodStart:'2026-07-01', periodEnd:'2026-09-01', consumption:14, cost:63.67, people:null, days:1, notes:'Gas casa vacanze - lug/ago; 14 Smc', createdAt:1795436949653 },
+          { id:'utility-2026-08-09-luce', transactionId:'bolletta-luce-2026-08-09', type:'electricity', date:'2026-09-30', periodStart:'2026-08-01', periodEnd:'2026-10-01', consumption:560.5, cost:169.23, people:null, days:1, notes:'Luce ago/set 2026; 2.242 kWh totali, 25% = 560,5 kWh', createdAt:1795436949655 }
+        ]
+      };
+      function applyNovemberPatch() {
+        if (state.patch20261123) return;
+        const txIds = new Set(state.transactions.map(t => t.id));
+        const utilityIds = new Set(state.utilities.map(u => u.id));
+        const taxPayments = { ...(state.taxPayments || {}) };
+        if (!taxPayments['2026-Q3']?.paid) taxPayments['2026-Q3'] = { paid:true, paidDate:'2026-11-23', paidAmount:469.35, note:'Versata 469,35 €' };
+        state = {
+          ...state,
+          transactions: [...state.transactions, ...NOVEMBER_PATCH.transactions.filter(t => !txIds.has(t.id))],
+          utilities: [...state.utilities, ...NOVEMBER_PATCH.utilities.filter(u => !utilityIds.has(u.id))],
+          taxPayments,
+          patch20261123: true
+        };
+        saveState('Voci di novembre aggiunte');
+      }
+
       window.CasaUI.mount({getState:()=>state,save:saveState,view:setView,openTransaction,today,download});
       updateTransactionFormMode('income');
       renderAll();
+      applyNovemberPatch();
       initializeAuth();
       if (isLocalPreview) fetch('.local-data/preview-state.json', {cache:'no-store'}).then(r=>r.ok?r.json():null).then(source=>{
         if (!source || localStorage.getItem(STORAGE_KEY+'-source')==='movimenti-20261008-v2') return;
@@ -1883,6 +1915,7 @@
         localStorage.setItem(STORAGE_KEY,JSON.stringify(state));
         localStorage.setItem(STORAGE_KEY+'-source','movimenti-20261008-v2');
         renderAll();
+        applyNovemberPatch();
         document.querySelector('.preview-banner').textContent='Anteprima locale · Copia privata dei 95 movimenti del CSV. Nessuna sincronizzazione con il tuo account.';
       }).catch(()=>{});
     })();
